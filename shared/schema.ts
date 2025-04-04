@@ -1,0 +1,94 @@
+import { pgTable, text, serial, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+// Crawls table for storing crawl information
+export const crawls = pgTable("crawls", {
+  id: serial("id").primaryKey(),
+  url: text("url").notNull(),
+  depth: integer("depth").notNull(),
+  status: text("status").notNull().default("idle"),
+  options: jsonb("options").notNull(),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  pageCount: integer("page_count").default(0),
+  error: text("error"),
+});
+
+// Pages table for storing crawled page content
+export const pages = pgTable("pages", {
+  id: serial("id").primaryKey(),
+  crawlId: integer("crawl_id").notNull().references(() => crawls.id),
+  url: text("url").notNull(),
+  path: text("path").notNull(),
+  content: text("content").notNull(),
+  title: text("title"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Assets table for storing downloaded assets (images, CSS, JS)
+export const assets = pgTable("assets", {
+  id: serial("id").primaryKey(),
+  crawlId: integer("crawl_id").notNull().references(() => crawls.id),
+  url: text("url").notNull(),
+  path: text("path").notNull(),
+  type: text("type").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// SavedSites table for storing saved crawl results
+export const savedSites = pgTable("saved_sites", {
+  id: serial("id").primaryKey(),
+  crawlId: integer("crawl_id").notNull().references(() => crawls.id),
+  url: text("url").notNull(),
+  name: text("name"),
+  pageCount: integer("page_count").notNull(),
+  size: integer("size").notNull(),
+  savedAt: timestamp("saved_at").notNull().defaultNow(),
+});
+
+// Insert schemas
+export const insertCrawlSchema = createInsertSchema(crawls).omit({ 
+  id: true, 
+  startedAt: true, 
+  completedAt: true, 
+  pageCount: true, 
+  error: true,
+  status: true
+});
+
+export const insertPageSchema = createInsertSchema(pages).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
+export const insertAssetSchema = createInsertSchema(assets).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
+export const insertSavedSiteSchema = createInsertSchema(savedSites).omit({ 
+  id: true, 
+  savedAt: true 
+});
+
+// Types
+export type Crawl = typeof crawls.$inferSelect;
+export type InsertCrawl = z.infer<typeof insertCrawlSchema>;
+export type Page = typeof pages.$inferSelect;
+export type InsertPage = z.infer<typeof insertPageSchema>;
+export type Asset = typeof assets.$inferSelect;
+export type InsertAsset = z.infer<typeof insertAssetSchema>;
+export type SavedSite = typeof savedSites.$inferSelect;
+export type InsertSavedSite = z.infer<typeof insertSavedSiteSchema>;
+
+// Options schema
+export const crawlOptionsSchema = z.object({
+  downloadImages: z.boolean().default(true),
+  preserveCss: z.boolean().default(true),
+  preserveNav: z.boolean().default(true),
+  respectRobots: z.boolean().default(true),
+});
+
+export type CrawlOptions = z.infer<typeof crawlOptionsSchema>;
