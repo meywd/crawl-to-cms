@@ -264,10 +264,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/assets/:crawlId/:path(*)", async (req: Request, res: Response) => {
     try {
       const crawlId = parseInt(req.params.crawlId);
-      const assetPath = req.params.path;
+      let assetPath = req.params.path;
       
       if (isNaN(crawlId)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
+      }
+      
+      // Fix duplicated API paths - if path starts with api/assets/crawlId/, remove that prefix
+      const apiPathPrefix = `api/assets/${crawlId}/`;
+      if (assetPath.startsWith(apiPathPrefix)) {
+        assetPath = assetPath.substring(apiPathPrefix.length);
+        console.log(`Fixed duplicated API path, new path: ${assetPath}`);
       }
 
       console.log(`Looking for asset with crawlId: ${crawlId}, path: ${assetPath}`);
@@ -461,6 +468,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (isNaN(crawlId)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
+      }
+      
+      // Fix duplicated API paths - if path starts with api/preview/crawlId/, remove that prefix
+      const apiPathPrefix = `api/preview/${crawlId}/`;
+      if (pagePath.startsWith(apiPathPrefix)) {
+        pagePath = pagePath.substring(apiPathPrefix.length);
+        console.log(`Fixed duplicated API path, new path: ${pagePath}`);
       }
 
       console.log(`Looking for page with crawlId: ${crawlId}, path: ${pagePath}`);
