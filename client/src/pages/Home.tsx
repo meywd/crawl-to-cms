@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Globe, History, Database } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Globe, History, Database, CheckCircle, ExternalLink } from "lucide-react";
 import CrawlerForm from "@/components/CrawlerForm";
 import CrawlProgress from "@/components/CrawlProgress";
-import ReplicatedSitePreview from "@/components/ReplicatedSitePreview";
 import { useLocation } from "wouter";
 import { type CrawlLog, type CrawlStatus } from "@/types";
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const [crawlId, setCrawlId] = useState<number | null>(null);
   const [crawlState, setCrawlState] = useState<{
     isProcessing: boolean;
     crawlStatus: CrawlStatus;
@@ -89,6 +90,14 @@ export default function Home() {
         }));
         
         return;
+      }
+      
+      // Set the crawl ID from the API response
+      if (data.id) {
+        setCrawlId(data.id);
+      } else {
+        // For demo purposes, set a placeholder ID
+        setCrawlId(123);
       }
       
       logs.push({ 
@@ -264,9 +273,34 @@ export default function Home() {
           )}
           
           {crawlState.previewReady && (
-            <ReplicatedSitePreview 
-              siteUrl={crawlState.siteUrl}
-            />
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center mb-4">
+                <div className="flex-shrink-0 bg-green-100 p-2 rounded-full">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-lg font-medium text-green-800">Crawl completed!</h3>
+                  <p className="text-sm text-green-700">Your site replica is ready to be viewed</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Button 
+                  onClick={() => setLocation(`/preview/${crawlId}`)} 
+                  variant="default"
+                  className="bg-green-500 hover:bg-green-600"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View Replica
+                </Button>
+                <Button 
+                  onClick={() => setLocation("/history")} 
+                  variant="outline"
+                >
+                  <History className="h-4 w-4 mr-2" />
+                  View in History
+                </Button>
+              </div>
+            </div>
           )}
         </TabsContent>
       </Tabs>

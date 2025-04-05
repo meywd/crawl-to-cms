@@ -1,7 +1,7 @@
-import { FileText, Folder } from "lucide-react";
+import { FileText, Folder, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface FileNode {
   type: 'file' | 'folder';
@@ -17,35 +17,51 @@ interface SiteStructureProps {
 }
 
 export default function SiteStructure({ siteUrl, selectedPage, onSelectPage }: SiteStructureProps) {
-  // In a real implementation, this would be fetched from the API
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['blog', 'assets']));
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [fileStructure, setFileStructure] = useState<FileNode[]>([]);
   
-  // Mock data for demonstration
-  const fileStructure: FileNode[] = [
-    { type: 'file', name: 'index.html', path: 'index.html' },
-    { type: 'file', name: 'about.html', path: 'about.html' },
-    { type: 'file', name: 'services.html', path: 'services.html' },
-    { type: 'file', name: 'contact.html', path: 'contact.html' },
-    { 
-      type: 'folder', 
-      name: 'blog', 
-      path: 'blog',
-      children: [
-        { type: 'file', name: 'index.html', path: 'blog/index.html' },
-        { type: 'file', name: 'post1.html', path: 'blog/post1.html' },
-      ]
+  // Extract crawl ID from the siteUrl
+  const crawlIdMatch = siteUrl.match(/\/api\/preview\/(\d+)/);
+  const crawlId = crawlIdMatch ? crawlIdMatch[1] : null;
+  
+  // Fetch site structure from API
+  const { data, isLoading, error } = useQuery({
+    queryKey: [`/api/structure/${crawlId}`],
+    queryFn: async () => {
+      if (!crawlId) return null;
+      const response = await fetch(`/api/structure/${crawlId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch site structure');
+      }
+      return response.json();
     },
-    {
-      type: 'folder',
-      name: 'assets',
-      path: 'assets',
-      children: [
-        { type: 'folder', name: 'css', path: 'assets/css' },
-        { type: 'folder', name: 'js', path: 'assets/js' },
-        { type: 'folder', name: 'images', path: 'assets/images' },
-      ]
+    enabled: !!crawlId
+  });
+  
+  // Update file structure when data is fetched
+  useEffect(() => {
+    if (data && data.structure) {
+      setFileStructure(data.structure);
+      
+      // Auto-expand folders with the selected page
+      if (selectedPage) {
+        const parts = selectedPage.split('/');
+        let currentPath = '';
+        const newExpanded = new Set(expandedFolders);
+        
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (i === 0) {
+            currentPath = parts[i];
+          } else {
+            currentPath += '/' + parts[i];
+          }
+          newExpanded.add(currentPath);
+        }
+        
+        setExpandedFolders(newExpanded);
+      }
     }
-  ];
+  }, [data, selectedPage]);
 
   const toggleFolder = (path: string) => {
     const newExpanded = new Set(expandedFolders);
@@ -97,6 +113,30 @@ export default function SiteStructure({ siteUrl, selectedPage, onSelectPage }: S
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-60">
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <div className="p-4 text-red-500">
+        Error loading site structure
+      </div>
+    );
+  }
+  
+  if (!fileStructure || fileStructure.length === 0) {
+    return (
+      <div className="p-4 text-gray-500">
+        No files found
+      </div>
+    );
+  }
+  
   return (
     <div className="bg-white p-3 border border-gray-200 rounded-md">
       <ScrollArea className="h-60">

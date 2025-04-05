@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import History from "@/pages/History";
 import SavedSites from "@/pages/SavedSites";
+import Preview from "@/pages/Preview";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/history" component={History} />
       <Route path="/saved-sites" component={SavedSites} />
+      <Route path="/preview/:id" component={Preview} />
       <Route component={NotFound} />
     </Switch>
   );

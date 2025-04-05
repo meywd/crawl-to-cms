@@ -266,7 +266,7 @@ export class WebCrawler {
             // Only rewrite links that are part of the same domain
             if (absoluteUrl.startsWith(baseUrl)) {
               const targetPath = this.getPagePath(absoluteUrl, baseUrl);
-              $(el).attr('href', `/api/preview/${crawlId}/${targetPath}`);
+              $(el).attr('href', `/preview/${crawlId}?path=${encodeURIComponent(targetPath)}`);
             }
           } catch (error) {
             // Invalid URL or other error, just leave it alone
