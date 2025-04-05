@@ -270,21 +270,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid crawl ID" });
       }
 
-      const asset = await storage.getAssetByPath(crawlId, assetPath);
+      console.log(`Looking for asset with crawlId: ${crawlId}, path: ${assetPath}`);
+      
+      // Try to find the asset directly
+      let asset = await storage.getAssetByPath(crawlId, assetPath);
+      
+      // If asset not found, try again with 'assets/' prefix if it's not already there
+      if (!asset && !assetPath.startsWith('assets/')) {
+        const altPath = `assets/${assetPath}`;
+        console.log(`Asset not found, trying with assets/ prefix: ${altPath}`);
+        asset = await storage.getAssetByPath(crawlId, altPath);
+      }
+      
+      // If still not found, try with various variations
       if (!asset) {
+        // Try without any prefix 
+        const pathParts = assetPath.split('/');
+        if (pathParts.length > 1) {
+          const cleanPath = pathParts[pathParts.length - 1];
+          console.log(`Asset not found, trying with just the filename: ${cleanPath}`);
+          asset = await storage.getAssetByPath(crawlId, cleanPath);
+        }
+      }
+
+      if (!asset) {
+        console.log(`Asset not found for path: ${assetPath}`);
         return res.status(404).json({ message: "Asset not found" });
       }
 
-      // Set the appropriate content type based on asset type
+      console.log(`Asset found: ${asset.url}`);
+
+      // Set the appropriate content type based on asset type or file extension
       if (asset.type === "image") {
-        res.setHeader("Content-Type", "image/jpeg"); // Default to JPEG, but in reality would be more dynamic
+        // Determine more specific image type based on extension
+        const fileExt = asset.path.split('.').pop()?.toLowerCase();
+        switch (fileExt) {
+          case 'jpg':
+          case 'jpeg':
+            res.setHeader("Content-Type", "image/jpeg");
+            break;
+          case 'png':
+            res.setHeader("Content-Type", "image/png");
+            break;
+          case 'gif':
+            res.setHeader("Content-Type", "image/gif");
+            break;
+          case 'svg':
+            res.setHeader("Content-Type", "image/svg+xml");
+            break;
+          case 'webp':
+            res.setHeader("Content-Type", "image/webp");
+            break;
+          case 'ico':
+            res.setHeader("Content-Type", "image/x-icon");
+            break;
+          default:
+            res.setHeader("Content-Type", "image/jpeg"); // Default fallback
+        }
       } else if (asset.type === "css") {
         res.setHeader("Content-Type", "text/css");
       } else if (asset.type === "js") {
         res.setHeader("Content-Type", "application/javascript");
+      } else {
+        // For other types, try to guess from extension
+        const fileExt = asset.path.split('.').pop()?.toLowerCase();
+        switch (fileExt) {
+          case 'json':
+            res.setHeader("Content-Type", "application/json");
+            break;
+          case 'xml':
+            res.setHeader("Content-Type", "application/xml");
+            break;
+          case 'html':
+          case 'htm':
+            res.setHeader("Content-Type", "text/html");
+            break;
+          case 'txt':
+            res.setHeader("Content-Type", "text/plain");
+            break;
+          case 'pdf':
+            res.setHeader("Content-Type", "application/pdf");
+            break;
+          case 'woff':
+            res.setHeader("Content-Type", "font/woff");
+            break;
+          case 'woff2':
+            res.setHeader("Content-Type", "font/woff2");
+            break;
+          case 'ttf':
+            res.setHeader("Content-Type", "font/ttf");
+            break;
+        }
       }
 
-      return res.status(200).send(asset.content);
+      // For base64-encoded images, decode before sending
+      if (asset.type === "image" && asset.content.startsWith("data:image")) {
+        // Already in data URI format, send as is
+        return res.status(200).send(asset.content);
+      } else if (asset.type === "image" && !asset.content.includes("data:image")) {
+        // Plain base64, reconstruct data URI
+        try {
+          // Try to decode base64 content (make sure it's a string)
+          const buffer = Buffer.from(asset.content, 'base64');
+          return res.status(200).send(buffer);
+        } catch (error) {
+          console.error("Error decoding image content:", error);
+          return res.status(200).send(asset.content); // Send as is if decoding fails
+        }
+      } else {
+        // For non-image content
+        return res.status(200).send(asset.content);
+      }
     } catch (error) {
       console.error("Error fetching asset:", error);
       return res.status(500).json({ message: "Internal server error" });
@@ -405,14 +501,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set content type based on the file extension
       if (pagePath.endsWith(".html") || pagePath.endsWith(".htm")) {
         res.setHeader("Content-Type", "text/html");
+        
+        // For HTML content, update resource paths to use our API endpoints
+        let content = page.content;
+        
+        // Get the crawl to extract original URL for path correction
+        const crawl = await storage.getCrawl(crawlId);
+        if (!crawl) {
+          return res.status(404).json({ message: "Crawl not found" });
+        }
+        
+        // Parse the URL to get the domain and path
+        const originalUrlObj = new URL(crawl.url);
+        const baseUrl = `${originalUrlObj.protocol}//${originalUrlObj.host}`;
+        
+        // Rewrite resource URLs in the HTML content to use our API endpoints
+        
+        // 1. Rewrite relative CSS urls (href="styles.css" -> href="/api/assets/{crawlId}/styles.css")
+        content = content.replace(
+          /(href=['"])(?!http|\/\/|data:|#|\/)([^'"]+\.css)(['"])/gi,
+          `$1/api/assets/${crawlId}/$2$3`
+        );
+        
+        // 2. Rewrite absolute CSS urls that match the original domain 
+        // (href="https://example.com/styles.css" -> href="/api/assets/{crawlId}/styles.css")
+        content = content.replace(
+          new RegExp(`(href=['"])(${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})?/([^'"]+\\.css)(['"])`, 'gi'),
+          `$1/api/assets/${crawlId}/$3$4`
+        );
+        
+        // 3. Rewrite relative JS urls
+        content = content.replace(
+          /(src=['"])(?!http|\/\/|data:|#|\/)([^'"]+\.js)(['"])/gi,
+          `$1/api/assets/${crawlId}/$2$3`
+        );
+        
+        // 4. Rewrite absolute JS urls that match the original domain
+        content = content.replace(
+          new RegExp(`(src=['"])(${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})?/([^'"]+\\.js)(['"])`, 'gi'),
+          `$1/api/assets/${crawlId}/$3$4`
+        );
+        
+        // 5. Rewrite relative image urls
+        content = content.replace(
+          /(src=['"])(?!http|\/\/|data:|#|\/)([^'"]+\.(jpg|jpeg|png|gif|svg|webp|ico))(['"])/gi,
+          `$1/api/assets/${crawlId}/$2$4`
+        );
+        
+        // 6. Rewrite absolute image urls that match the original domain
+        content = content.replace(
+          new RegExp(`(src=['"])(${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})?/([^'"]+\\.(jpg|jpeg|png|gif|svg|webp|ico))(['"])`, 'gi'),
+          `$1/api/assets/${crawlId}/$3$5`
+        );
+        
+        // 7. Rewrite image urls in srcset attributes
+        content = content.replace(
+          /(srcset=['"])([^'"]+)(['"])/gi,
+          (match, p1, srcset, p3) => {
+            const newSrcset = srcset.split(',').map((src: string) => {
+              const parts = src.trim().split(/\s+/);
+              const url = parts[0];
+              const descriptor = parts.slice(1).join(' ');
+              
+              if (url.startsWith('http') && !url.startsWith(baseUrl)) {
+                // External URL, leave as is
+                return `${url} ${descriptor || ''}`.trim();
+              } else if (url.startsWith('/')) {
+                // Absolute path
+                return `/api/assets/${crawlId}/${url.slice(1)} ${descriptor || ''}`.trim();
+              } else if (!url.startsWith('data:')) {
+                // Relative path
+                return `/api/assets/${crawlId}/${url} ${descriptor || ''}`.trim();
+              }
+              return src.trim();
+            }).join(', ');
+            
+            return `${p1}${newSrcset}${p3}`;
+          }
+        );
+        
+        // 8. Rewrite background image urls in inline styles
+        content = content.replace(
+          /(background(-image)?:[\s]*url\(['"]?)(?!http|\/\/|data:|#|\/)([^'")]+)(['"]?\))/gi,
+          `$1/api/assets/${crawlId}/$3$4`
+        );
+        
+        // 9. Rewrite internal links to use our preview API
+        content = content.replace(
+          /(href=['"])(?!http|\/\/|data:|#|mailto:|tel:)([^'"]+)(['"])/gi,
+          (match: string, p1: string, path: string, p3: string) => {
+            // Skip CSS files as they're handled separately
+            if (path.endsWith('.css')) return match;
+            
+            // Clean the path - remove leading slash if present
+            const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+            
+            return `${p1}/api/preview/${crawlId}/${cleanPath}${p3}`;
+          }
+        );
+        
+        // 10. Rewrite absolute internal links to use our preview API
+        content = content.replace(
+          new RegExp(`(href=['"])(${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(/[^'"]+)(['"])`, 'gi'),
+          (match: string, p1: string, domain: string, path: string, p4: string) => {
+            // Skip CSS files 
+            if (path.endsWith('.css')) return match;
+            
+            // Clean the path - remove leading slash if present
+            const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+            
+            return `${p1}/api/preview/${crawlId}/${cleanPath}${p4}`;
+          }
+        );
+        
+        // Inject a base tag to help with relative paths 
+        if (!content.includes('<base ')) {
+          content = content.replace(
+            '<head>',
+            `<head>\n<base href="/api/preview/${crawlId}/">`
+          );
+        }
+        
+        console.log(`Serving rewritten preview for ${pagePath}`);
+        return res.status(200).send(content);
       } else if (pagePath.endsWith(".css")) {
         res.setHeader("Content-Type", "text/css");
+        
+        // For CSS content, rewrite urls inside the CSS
+        let content = page.content;
+        
+        // Get the crawl to extract original URL for path correction
+        const crawl = await storage.getCrawl(crawlId);
+        if (!crawl) {
+          return res.status(404).json({ message: "Crawl not found" });
+        }
+        
+        // Rewrite url() references in CSS
+        content = content.replace(
+          /url\(['"]?(?!data:|http|\/\/)([^'")]+)['"]?\)/gi,
+          `url('/api/assets/${crawlId}/$1')`
+        );
+        
+        // Rewrite absolute URLs that reference the original domain
+        const originalUrlObj = new URL(crawl.url);
+        const baseUrl = `${originalUrlObj.protocol}//${originalUrlObj.host}`;
+        
+        content = content.replace(
+          new RegExp(`url\\(['"](${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})?/([^'"\\)]+)['"\\)]`, 'gi'),
+          `url('/api/assets/${crawlId}/$2')`
+        );
+        
+        console.log(`Serving rewritten CSS for ${pagePath}`);
+        return res.status(200).send(content);
       } else if (pagePath.endsWith(".js")) {
         res.setHeader("Content-Type", "application/javascript");
+        console.log(`Serving JavaScript for ${pagePath}`);
+        return res.status(200).send(page.content);
+      } else {
+        // Other content types
+        const extension = pagePath.split('.').pop()?.toLowerCase();
+        switch (extension) {
+          case 'json':
+            res.setHeader("Content-Type", "application/json");
+            break;
+          case 'xml':
+            res.setHeader("Content-Type", "application/xml");
+            break;
+          case 'txt':
+            res.setHeader("Content-Type", "text/plain");
+            break;
+          case 'svg':
+            res.setHeader("Content-Type", "image/svg+xml");
+            break;
+        }
+        
+        console.log(`Serving ${extension} file for ${pagePath}`);
+        return res.status(200).send(page.content);
       }
-
-      console.log(`Serving preview for ${pagePath}`);
-      return res.status(200).send(page.content);
     } catch (error) {
       console.error("Error serving preview:", error);
       return res.status(500).json({ message: "Internal server error" });
