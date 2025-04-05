@@ -270,9 +270,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid crawl ID" });
       }
       
-      // Fix duplicated API paths - if path starts with api/assets/crawlId/, remove that prefix
+      // Fix duplicated API paths recursively - handle multiple levels of duplication
       const apiPathPrefix = `api/assets/${crawlId}/`;
-      if (assetPath.startsWith(apiPathPrefix)) {
+      while (assetPath.startsWith(apiPathPrefix)) {
         assetPath = assetPath.substring(apiPathPrefix.length);
         console.log(`Fixed duplicated API path, new path: ${assetPath}`);
       }
@@ -470,9 +470,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid crawl ID" });
       }
       
-      // Fix duplicated API paths - if path starts with api/preview/crawlId/, remove that prefix
+      // Fix duplicated API paths recursively - handle multiple levels of duplication
       const apiPathPrefix = `api/preview/${crawlId}/`;
-      if (pagePath.startsWith(apiPathPrefix)) {
+      while (pagePath.startsWith(apiPathPrefix)) {
         pagePath = pagePath.substring(apiPathPrefix.length);
         console.log(`Fixed duplicated API path, new path: ${pagePath}`);
       }
@@ -560,7 +560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // 1. Rewrite relative CSS urls (href="styles.css" -> href="/api/assets/{crawlId}/styles.css")
         content = content.replace(
-          /(href=['"])(?!http|\/\/|data:|#|\/)([^'"]+\.css)(['"])/gi,
+          /(href=['"])(?!http|\/\/|data:|#|\/api\/assets\/|\/)([^'"]+\.css)(['"])/gi,
           `$1/api/assets/${crawlId}/$2$3`
         );
         
@@ -576,7 +576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // 3. Rewrite relative JS urls
         content = content.replace(
-          /(src=['"])(?!http|\/\/|data:|#|\/)([^'"]+\.js)(['"])/gi,
+          /(src=['"])(?!http|\/\/|data:|#|\/api\/assets\/|\/)([^'"]+\.js)(['"])/gi,
           `$1/api/assets/${crawlId}/$2$3`
         );
         
@@ -591,7 +591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // 5. Rewrite relative image urls
         content = content.replace(
-          /(src=['"])(?!http|\/\/|data:|#|\/)([^'"]+\.(jpg|jpeg|png|gif|svg|webp|ico))(['"])/gi,
+          /(src=['"])(?!http|\/\/|data:|#|\/api\/assets\/|\/)([^'"]+\.(jpg|jpeg|png|gif|svg|webp|ico))(['"])/gi,
           `$1/api/assets/${crawlId}/$2$4`
         );
         
@@ -635,13 +635,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // 8. Rewrite background image urls in inline styles
         content = content.replace(
-          /(background(-image)?:[\s]*url\(['"]?)(?!http|\/\/|data:|#|\/)([^'")]+)(['"]?\))/gi,
+          /(background(-image)?:[\s]*url\(['"]?)(?!http|\/\/|data:|#|\/api\/assets\/|\/)([^'")]+)(['"]?\))/gi,
           `$1/api/assets/${crawlId}/$3$4`
         );
         
         // 9. Rewrite internal links to use our preview API
         content = content.replace(
-          /(href=['"])(?!http|\/\/|data:|#|mailto:|tel:)([^'"]+)(['"])/gi,
+          /(href=['"])(?!http|\/\/|data:|#|mailto:|tel:|\/api\/preview\/)([^'"]+)(['"])/gi,
           (match: string, p1: string, path: string, p3: string) => {
             // Skip CSS files as they're handled separately
             if (path.endsWith('.css')) return match;
@@ -694,7 +694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Rewrite url() references in CSS
         content = content.replace(
-          /url\(['"]?(?!data:|http|\/\/)([^'")]+)['"]?\)/gi,
+          /url\(['"]?(?!data:|http|\/\/|\/api\/assets\/)([^'")]+)['"]?\)/gi,
           `url('/api/assets/${crawlId}/$1')`
         );
         
