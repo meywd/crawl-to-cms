@@ -519,6 +519,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // For HTML content, update resource paths to use our API endpoints
         let content = page.content;
         
+        // First, clean up any duplicate asset paths that might already exist
+        const assetPathPattern = new RegExp(`/api/assets/${crawlId}/api/assets/${crawlId}/`, 'g');
+        if (content.includes(`/api/assets/${crawlId}/api/assets/${crawlId}/`)) {
+          console.log(`Found duplicate asset paths, cleaning them up`);
+          content = content.replace(assetPathPattern, `/api/assets/${crawlId}/`);
+        }
+        
         // Get the crawl to extract original URL for path correction
         const crawl = await storage.getCrawl(crawlId);
         if (!crawl) {
@@ -678,6 +685,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
         }
         
+        // Final cleanup to catch any duplicated paths that might have been introduced
+        const finalCleanupPattern = new RegExp(`/api/assets/${crawlId}/api/assets/${crawlId}/`, 'g');
+        if (content.includes(`/api/assets/${crawlId}/api/assets/${crawlId}/`)) {
+          console.log(`Performing final cleanup of duplicate asset paths`);
+          while (content.includes(`/api/assets/${crawlId}/api/assets/${crawlId}/`)) {
+            content = content.replace(finalCleanupPattern, `/api/assets/${crawlId}/`);
+          }
+        }
+        
         console.log(`Serving rewritten preview for ${pagePath}`);
         return res.status(200).send(content);
       } else if (pagePath.endsWith(".css")) {
@@ -735,6 +751,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             new RegExp(`url\\(['"](${escapedBaseUrl})?/([^'"\\)]+)['"\\)]`, 'gi'),
             `url('/api/assets/${crawlId}/$2')`
           );
+        }
+        
+        // Final cleanup for any duplicated asset paths in CSS
+        const cssCleanupPattern = new RegExp(`/api/assets/${crawlId}/api/assets/${crawlId}/`, 'g');
+        if (content.includes(`/api/assets/${crawlId}/api/assets/${crawlId}/`)) {
+          console.log(`Performing final cleanup of duplicate asset paths in CSS`);
+          while (content.includes(`/api/assets/${crawlId}/api/assets/${crawlId}/`)) {
+            content = content.replace(cssCleanupPattern, `/api/assets/${crawlId}/`);
+          }
         }
         
         console.log(`Serving rewritten CSS for ${pagePath}`);
