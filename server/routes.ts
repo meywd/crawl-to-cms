@@ -519,11 +519,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // For HTML content, update resource paths to use our API endpoints
         let content = page.content;
         
-        // First, clean up any duplicate asset paths that might already exist
+        // First, clean up any duplicate asset or preview paths that might already exist
         const assetPathPattern = new RegExp(`/api/assets/${crawlId}/api/assets/${crawlId}/`, 'g');
+        const previewAssetPathPattern = new RegExp(`/api/preview/${crawlId}/api/assets/${crawlId}/`, 'g');
+        const previewPathPattern = new RegExp(`/api/preview/${crawlId}/preview/${crawlId}`, 'g');
+        
         if (content.includes(`/api/assets/${crawlId}/api/assets/${crawlId}/`)) {
           console.log(`Found duplicate asset paths, cleaning them up`);
           content = content.replace(assetPathPattern, `/api/assets/${crawlId}/`);
+        }
+        
+        if (content.includes(`/api/preview/${crawlId}/api/assets/${crawlId}/`)) {
+          console.log(`Found preview-asset path mix, cleaning them up`);
+          content = content.replace(previewAssetPathPattern, `/api/assets/${crawlId}/`);
+        }
+        
+        if (content.includes(`/api/preview/${crawlId}/preview/${crawlId}`)) {
+          console.log(`Found duplicate preview paths, cleaning them up`);
+          content = content.replace(previewPathPattern, `/api/preview/${crawlId}`);
         }
         
         // Get the crawl to extract original URL for path correction
@@ -686,11 +699,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Final cleanup to catch any duplicated paths that might have been introduced
-        const finalCleanupPattern = new RegExp(`/api/assets/${crawlId}/api/assets/${crawlId}/`, 'g');
+        const finalAssetCleanupPattern = new RegExp(`/api/assets/${crawlId}/api/assets/${crawlId}/`, 'g');
+        const finalPreviewAssetCleanupPattern = new RegExp(`/api/preview/${crawlId}/api/assets/${crawlId}/`, 'g');
+        const finalPreviewCleanupPattern = new RegExp(`/api/preview/${crawlId}/preview/${crawlId}`, 'g');
+        
         if (content.includes(`/api/assets/${crawlId}/api/assets/${crawlId}/`)) {
           console.log(`Performing final cleanup of duplicate asset paths`);
           while (content.includes(`/api/assets/${crawlId}/api/assets/${crawlId}/`)) {
-            content = content.replace(finalCleanupPattern, `/api/assets/${crawlId}/`);
+            content = content.replace(finalAssetCleanupPattern, `/api/assets/${crawlId}/`);
+          }
+        }
+        
+        if (content.includes(`/api/preview/${crawlId}/api/assets/${crawlId}/`)) {
+          console.log(`Performing final cleanup of preview-asset path mix`);
+          while (content.includes(`/api/preview/${crawlId}/api/assets/${crawlId}/`)) {
+            content = content.replace(finalPreviewAssetCleanupPattern, `/api/assets/${crawlId}/`);
+          }
+        }
+        
+        if (content.includes(`/api/preview/${crawlId}/preview/${crawlId}`)) {
+          console.log(`Performing final cleanup of duplicate preview paths`);
+          while (content.includes(`/api/preview/${crawlId}/preview/${crawlId}`)) {
+            content = content.replace(finalPreviewCleanupPattern, `/api/preview/${crawlId}`);
           }
         }
         
@@ -754,11 +784,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Final cleanup for any duplicated asset paths in CSS
-        const cssCleanupPattern = new RegExp(`/api/assets/${crawlId}/api/assets/${crawlId}/`, 'g');
+        const cssAssetCleanupPattern = new RegExp(`/api/assets/${crawlId}/api/assets/${crawlId}/`, 'g');
+        const cssPreviewAssetCleanupPattern = new RegExp(`/api/preview/${crawlId}/api/assets/${crawlId}/`, 'g');
+        
         if (content.includes(`/api/assets/${crawlId}/api/assets/${crawlId}/`)) {
           console.log(`Performing final cleanup of duplicate asset paths in CSS`);
           while (content.includes(`/api/assets/${crawlId}/api/assets/${crawlId}/`)) {
-            content = content.replace(cssCleanupPattern, `/api/assets/${crawlId}/`);
+            content = content.replace(cssAssetCleanupPattern, `/api/assets/${crawlId}/`);
+          }
+        }
+        
+        if (content.includes(`/api/preview/${crawlId}/api/assets/${crawlId}/`)) {
+          console.log(`Performing final cleanup of preview-asset path mix in CSS`);
+          while (content.includes(`/api/preview/${crawlId}/api/assets/${crawlId}/`)) {
+            content = content.replace(cssPreviewAssetCleanupPattern, `/api/assets/${crawlId}/`);
           }
         }
         
