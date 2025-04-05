@@ -512,8 +512,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Parse the URL to get the domain and path
-        const originalUrlObj = new URL(crawl.url);
-        const baseUrl = `${originalUrlObj.protocol}//${originalUrlObj.host}`;
+        // Ensure URL has proper protocol for parsing
+        let baseUrl = '';
+        try {
+          // Make sure the URL has a valid protocol
+          let urlForParsing = crawl.url;
+          if (!urlForParsing.match(/^https?:\/\//)) {
+            urlForParsing = 'https://' + urlForParsing;
+          }
+          const originalUrlObj = new URL(urlForParsing);
+          baseUrl = `${originalUrlObj.protocol}//${originalUrlObj.host}`;
+          console.log(`Successfully parsed URL: ${baseUrl} from ${crawl.url}`);
+        } catch (error) {
+          console.error(`Error parsing URL ${crawl.url}:`, error);
+          // Use a fallback approach for the baseUrl
+          // Extract domain from URL more robustly
+          if (crawl.url) {
+            // Try to extract domain by removing protocol and path
+            const domainMatch = crawl.url.match(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/i);
+            if (domainMatch && domainMatch[1]) {
+              baseUrl = `https://${domainMatch[1]}`;
+            } else {
+              // Last resort fallback
+              baseUrl = '';
+            }
+          } else {
+            baseUrl = '';
+          }
+          console.log(`Using fallback baseUrl: ${baseUrl}`);
+        }
         
         // Rewrite resource URLs in the HTML content to use our API endpoints
         
@@ -525,10 +552,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // 2. Rewrite absolute CSS urls that match the original domain 
         // (href="https://example.com/styles.css" -> href="/api/assets/{crawlId}/styles.css")
-        content = content.replace(
-          new RegExp(`(href=['"])(${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})?/([^'"]+\\.css)(['"])`, 'gi'),
-          `$1/api/assets/${crawlId}/$3$4`
-        );
+        if (baseUrl) {
+          const escapedBaseUrl = baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          content = content.replace(
+            new RegExp(`(href=['"])(${escapedBaseUrl})?/([^'"]+\\.css)(['"])`, 'gi'),
+            `$1/api/assets/${crawlId}/$3$4`
+          );
+        }
         
         // 3. Rewrite relative JS urls
         content = content.replace(
@@ -537,10 +567,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         // 4. Rewrite absolute JS urls that match the original domain
-        content = content.replace(
-          new RegExp(`(src=['"])(${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})?/([^'"]+\\.js)(['"])`, 'gi'),
-          `$1/api/assets/${crawlId}/$3$4`
-        );
+        if (baseUrl) {
+          const escapedBaseUrl = baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          content = content.replace(
+            new RegExp(`(src=['"])(${escapedBaseUrl})?/([^'"]+\\.js)(['"])`, 'gi'),
+            `$1/api/assets/${crawlId}/$3$4`
+          );
+        }
         
         // 5. Rewrite relative image urls
         content = content.replace(
@@ -549,10 +582,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         // 6. Rewrite absolute image urls that match the original domain
-        content = content.replace(
-          new RegExp(`(src=['"])(${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})?/([^'"]+\\.(jpg|jpeg|png|gif|svg|webp|ico))(['"])`, 'gi'),
-          `$1/api/assets/${crawlId}/$3$5`
-        );
+        if (baseUrl) {
+          const escapedBaseUrl = baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          content = content.replace(
+            new RegExp(`(src=['"])(${escapedBaseUrl})?/([^'"]+\\.(jpg|jpeg|png|gif|svg|webp|ico))(['"])`, 'gi'),
+            `$1/api/assets/${crawlId}/$3$5`
+          );
+        }
         
         // 7. Rewrite image urls in srcset attributes
         content = content.replace(
@@ -563,9 +599,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const url = parts[0];
               const descriptor = parts.slice(1).join(' ');
               
-              if (url.startsWith('http') && !url.startsWith(baseUrl)) {
-                // External URL, leave as is
-                return `${url} ${descriptor || ''}`.trim();
+              if (url.startsWith('http')) {
+                // If baseUrl is empty, or it's an external URL
+                if (!baseUrl || !url.startsWith(baseUrl)) {
+                  // External URL, leave as is
+                  return `${url} ${descriptor || ''}`.trim();
+                }
               } else if (url.startsWith('/')) {
                 // Absolute path
                 return `/api/assets/${crawlId}/${url.slice(1)} ${descriptor || ''}`.trim();
@@ -601,18 +640,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         // 10. Rewrite absolute internal links to use our preview API
-        content = content.replace(
-          new RegExp(`(href=['"])(${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(/[^'"]+)(['"])`, 'gi'),
-          (match: string, p1: string, domain: string, path: string, p4: string) => {
-            // Skip CSS files 
-            if (path.endsWith('.css')) return match;
-            
-            // Clean the path - remove leading slash if present
-            const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-            
-            return `${p1}/api/preview/${crawlId}/${cleanPath}${p4}`;
-          }
-        );
+        if (baseUrl) {
+          const escapedBaseUrl = baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          content = content.replace(
+            new RegExp(`(href=['"])(${escapedBaseUrl})(/[^'"]+)(['"])`, 'gi'),
+            (match: string, p1: string, domain: string, path: string, p4: string) => {
+              // Skip CSS files 
+              if (path.endsWith('.css')) return match;
+              
+              // Clean the path - remove leading slash if present
+              const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+              
+              return `${p1}/api/preview/${crawlId}/${cleanPath}${p4}`;
+            }
+          );
+        }
         
         // Inject a base tag to help with relative paths 
         if (!content.includes('<base ')) {
@@ -643,13 +685,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         // Rewrite absolute URLs that reference the original domain
-        const originalUrlObj = new URL(crawl.url);
-        const baseUrl = `${originalUrlObj.protocol}//${originalUrlObj.host}`;
+        // Ensure URL has proper protocol for parsing
+        let baseUrl = '';
+        try {
+          // Make sure the URL has a valid protocol
+          let urlForParsing = crawl.url;
+          if (!urlForParsing.match(/^https?:\/\//)) {
+            urlForParsing = 'https://' + urlForParsing;
+          }
+          const originalUrlObj = new URL(urlForParsing);
+          baseUrl = `${originalUrlObj.protocol}//${originalUrlObj.host}`;
+          console.log(`Successfully parsed URL in CSS handler: ${baseUrl} from ${crawl.url}`);
+        } catch (error) {
+          console.error(`Error parsing URL in CSS handler ${crawl.url}:`, error);
+          // Use a fallback approach for the baseUrl
+          // Extract domain from URL more robustly
+          if (crawl.url) {
+            // Try to extract domain by removing protocol and path
+            const domainMatch = crawl.url.match(/^(?:https?:\/\/)?(?:www\.)?([^\/]+)/i);
+            if (domainMatch && domainMatch[1]) {
+              baseUrl = `https://${domainMatch[1]}`;
+            } else {
+              // Last resort fallback
+              baseUrl = '';
+            }
+          } else {
+            baseUrl = '';
+          }
+          console.log(`Using fallback baseUrl in CSS handler: ${baseUrl}`);
+        }
         
-        content = content.replace(
-          new RegExp(`url\\(['"](${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})?/([^'"\\)]+)['"\\)]`, 'gi'),
-          `url('/api/assets/${crawlId}/$2')`
-        );
+        if (baseUrl) {
+          const escapedBaseUrl = baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          content = content.replace(
+            new RegExp(`url\\(['"](${escapedBaseUrl})?/([^'"\\)]+)['"\\)]`, 'gi'),
+            `url('/api/assets/${crawlId}/$2')`
+          );
+        }
         
         console.log(`Serving rewritten CSS for ${pagePath}`);
         return res.status(200).send(content);
