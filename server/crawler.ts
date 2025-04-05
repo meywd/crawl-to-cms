@@ -283,7 +283,10 @@ export class WebCrawler {
     // Extract page title
     const title = $('title').text() || pagePath;
     
-    // If preserving CSS is enabled, replace CSS URLs
+    // Track resources to download after processing the HTML
+    const resourcesToDownload: { url: string; type: string; assetPath: string }[] = [];
+    
+    // If preserving CSS is enabled, replace CSS URLs and queue CSS files for download
     if (options.preserveCss) {
       // Handle external stylesheets
       $('link[rel="stylesheet"], link[as="style"], link[type="text/css"]').each((i, el) => {
@@ -294,6 +297,13 @@ export class WebCrawler {
             const assetPath = this.getAssetPath(absoluteUrl, baseUrl);
             $(el).attr('href', `/api/assets/${crawlId}/${assetPath}`);
             console.log(`Replaced CSS link: ${href} -> /api/assets/${crawlId}/${assetPath}`);
+            
+            // Queue CSS file for download
+            resourcesToDownload.push({
+              url: absoluteUrl,
+              type: 'css',
+              assetPath
+            });
           } catch (error) {
             console.log(`Error processing CSS link ${href}:`, error);
             // Keep the original href if there's an error
@@ -310,6 +320,13 @@ export class WebCrawler {
             const assetPath = this.getAssetPath(absoluteUrl, baseUrl);
             $(el).attr('src', `/api/assets/${crawlId}/${assetPath}`);
             console.log(`Replaced script src: ${src} -> /api/assets/${crawlId}/${assetPath}`);
+            
+            // Queue JS file for download
+            resourcesToDownload.push({
+              url: absoluteUrl,
+              type: 'js',
+              assetPath
+            });
           } catch (error) {
             console.log(`Error processing script ${src}:`, error);
             // Keep the original src if there's an error
@@ -321,6 +338,27 @@ export class WebCrawler {
       $('style').each((i, el) => {
         const styleContent = $(el).html();
         if (styleContent) {
+          // Collect @import resources to download
+          const importMatches = styleContent.match(/@import\s+url\(['"]?([^'")\s]+)['"]?\)/g) || [];
+          for (const importMatch of importMatches) {
+            const importUrl = importMatch.match(/@import\s+url\(['"]?([^'")\s]+)['"]?\)/)?.[1];
+            if (importUrl && !importUrl.startsWith('data:')) {
+              try {
+                const absoluteUrl = new URL(importUrl, url).toString();
+                const assetPath = this.getAssetPath(absoluteUrl, baseUrl);
+                
+                // Queue imported CSS file for download
+                resourcesToDownload.push({
+                  url: absoluteUrl,
+                  type: 'css',
+                  assetPath
+                });
+              } catch (error) {
+                // Skip if URL is invalid
+              }
+            }
+          }
+          
           // Replace @import url(...) references
           const updatedStyle = styleContent.replace(
             /@import\s+url\(['"]?([^'")\s]+)['"]?\)/g,
@@ -334,6 +372,27 @@ export class WebCrawler {
               }
             }
           );
+          
+          // Collect background image resources to download
+          const urlMatches = updatedStyle.match(/url\(['"]?([^'")\s]+)['"]?\)/g) || [];
+          for (const urlMatch of urlMatches) {
+            const resourceUrl = urlMatch.match(/url\(['"]?([^'")\s]+)['"]?\)/)?.[1];
+            if (resourceUrl && !resourceUrl.startsWith('data:')) {
+              try {
+                const absoluteUrl = new URL(resourceUrl, url).toString();
+                const assetPath = this.getAssetPath(absoluteUrl, baseUrl);
+                
+                // Queue image file for download
+                resourcesToDownload.push({
+                  url: absoluteUrl,
+                  type: 'image',
+                  assetPath
+                });
+              } catch (error) {
+                // Skip if URL is invalid
+              }
+            }
+          }
           
           // Replace url(...) references in the style content
           const finalStyle = updatedStyle.replace(
@@ -359,7 +418,7 @@ export class WebCrawler {
       });
     }
     
-    // If downloading images is enabled, replace image URLs
+    // If downloading images is enabled, replace image URLs and queue images for download
     if (options.downloadImages) {
       // Handle standard img tags
       $('img').each((i, el) => {
@@ -371,14 +430,30 @@ export class WebCrawler {
             $(el).attr('src', `/api/assets/${crawlId}/${assetPath}`);
             console.log(`Replaced image src: ${src} -> /api/assets/${crawlId}/${assetPath}`);
             
+            // Queue image for download
+            resourcesToDownload.push({
+              url: absoluteUrl,
+              type: 'image',
+              assetPath
+            });
+            
             // Also handle srcset if present
             const srcset = $(el).attr('srcset');
             if (srcset) {
-              const newSrcset = srcset.split(',').map(srcSetPart => {
+              const srcsetParts = srcset.split(',');
+              const newSrcset = srcsetParts.map(srcSetPart => {
                 const [imgUrl, size] = srcSetPart.trim().split(/\s+/);
                 try {
                   const absoluteSrcSetUrl = new URL(imgUrl, url).toString();
                   const srcSetAssetPath = this.getAssetPath(absoluteSrcSetUrl, baseUrl);
+                  
+                  // Queue srcset image for download
+                  resourcesToDownload.push({
+                    url: absoluteSrcSetUrl,
+                    type: 'image',
+                    assetPath: srcSetAssetPath
+                  });
+                  
                   return `/api/assets/${crawlId}/${srcSetAssetPath} ${size || ''}`.trim();
                 } catch (error) {
                   return srcSetPart; // Keep original on error
@@ -399,11 +474,20 @@ export class WebCrawler {
         const srcset = $(el).attr('srcset');
         if (srcset) {
           try {
-            const newSrcset = srcset.split(',').map(srcSetPart => {
+            const srcsetParts = srcset.split(',');
+            const newSrcset = srcsetParts.map(srcSetPart => {
               const [imgUrl, size] = srcSetPart.trim().split(/\s+/);
               try {
                 const absoluteSrcSetUrl = new URL(imgUrl, url).toString();
                 const srcSetAssetPath = this.getAssetPath(absoluteSrcSetUrl, baseUrl);
+                
+                // Queue picture source image for download
+                resourcesToDownload.push({
+                  url: absoluteSrcSetUrl,
+                  type: 'image',
+                  assetPath: srcSetAssetPath
+                });
+                
                 return `/api/assets/${crawlId}/${srcSetAssetPath} ${size || ''}`.trim();
               } catch (error) {
                 return srcSetPart; // Keep original on error
@@ -421,6 +505,27 @@ export class WebCrawler {
       $('[style*="background"], [style*="background-image"]').each((i, el) => {
         const style = $(el).attr('style');
         if (style) {
+          // Collect background image resources to download
+          const urlMatches = style.match(/url\(['"]?([^'")\s]+)['"]?\)/g) || [];
+          for (const urlMatch of urlMatches) {
+            const resourceUrl = urlMatch.match(/url\(['"]?([^'")\s]+)['"]?\)/)?.[1];
+            if (resourceUrl && !resourceUrl.startsWith('data:')) {
+              try {
+                const absoluteUrl = new URL(resourceUrl, url).toString();
+                const assetPath = this.getAssetPath(absoluteUrl, baseUrl);
+                
+                // Queue background image for download
+                resourcesToDownload.push({
+                  url: absoluteUrl,
+                  type: 'image',
+                  assetPath
+                });
+              } catch (error) {
+                // Skip if URL is invalid
+              }
+            }
+          }
+          
           const newStyle = style.replace(
             /url\(['"]?([^'")\s]+)['"]?\)/g,
             (match, resourceUrl) => {
@@ -517,6 +622,93 @@ export class WebCrawler {
       content: processedHtml,
       title
     });
+    
+    // Download all the resources we've identified
+    console.log(`Downloading ${resourcesToDownload.length} resources for ${url}`);
+    
+    // Use a Set to remove duplicate resources by URL
+    const uniqueResources = Array.from(
+      new Map(resourcesToDownload.map(item => [item.url, item])).values()
+    );
+    
+    // Download resources in parallel with a reasonable concurrency limit
+    const concurrencyLimit = 5;
+    const chunks = [];
+    for (let i = 0; i < uniqueResources.length; i += concurrencyLimit) {
+      chunks.push(uniqueResources.slice(i, i + concurrencyLimit));
+    }
+    
+    for (const chunk of chunks) {
+      await Promise.all(chunk.map(async (resource) => {
+        try {
+          console.log(`Downloading resource: ${resource.url} as ${resource.type}`);
+          const response = await fetch(resource.url);
+          
+          if (!response.ok) {
+            console.warn(`Failed to fetch resource ${resource.url}: ${response.status} ${response.statusText}`);
+            return;
+          }
+          
+          if (resource.type === 'image') {
+            const arrayBuffer = await response.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            
+            await this.storage.createAsset({
+              crawlId,
+              url: resource.url,
+              path: resource.assetPath,
+              type: resource.type,
+              content: buffer.toString('base64') // Store as base64
+            });
+            console.log(`Successfully saved image: ${resource.url}`);
+          } else {
+            // CSS or JS content
+            const content = await response.text();
+            
+            // For CSS, process any nested URL references
+            let processedContent = content;
+            if (resource.type === 'css') {
+              processedContent = content.replace(
+                /url\(['"]?([^'")\s]+)['"]?\)/g,
+                (match, resourceUrl) => {
+                  // Skip data URLs
+                  if (resourceUrl.startsWith('data:')) {
+                    return match;
+                  }
+                  
+                  try {
+                    const absoluteUrl = new URL(resourceUrl, resource.url).toString();
+                    const assetPath = this.getAssetPath(absoluteUrl, baseUrl);
+                    
+                    // Queue this nested resource for download in the next batch
+                    resourcesToDownload.push({
+                      url: absoluteUrl,
+                      type: resourceUrl.match(/\.(jpg|jpeg|png|gif|svg|webp|ico)$/i) ? 'image' : 'other',
+                      assetPath
+                    });
+                    
+                    return `url("/api/assets/${crawlId}/${assetPath}")`;
+                  } catch (error) {
+                    return match; // Keep original on error
+                  }
+                }
+              );
+            }
+            
+            await this.storage.createAsset({
+              crawlId,
+              url: resource.url,
+              path: resource.assetPath,
+              type: resource.type,
+              content: processedContent
+            });
+            console.log(`Successfully saved ${resource.type}: ${resource.url}`);
+          }
+        } catch (error) {
+          console.error(`Error downloading resource ${resource.url}:`, error);
+        }
+      }));
+    }
   }
 
   private extractLinks(url: string, baseUrl: string, html: string): string[] {

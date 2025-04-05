@@ -1,16 +1,31 @@
 import { useEffect, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Home, ArrowLeft } from "lucide-react";
+import { Loader2, Home, ArrowLeft, FileType, Image, FileCode, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import ReplicatedSitePreview from "@/components/ReplicatedSitePreview";
 import SiteStructure from "@/components/SiteStructure";
+
+// Asset types for display
+type AssetRecord = {
+  type: string;
+  path: string;
+  url?: string;
+};
 
 export default function Preview() {
   const [match, params] = useRoute("/preview/:id");
   const [, setLocation] = useLocation();
   const [selectedPage, setSelectedPage] = useState("index.html");
+  const [activeTab, setActiveTab] = useState("preview");
+  const [assets, setAssets] = useState<AssetRecord[]>([]);
+  const [cssAssets, setCssAssets] = useState<AssetRecord[]>([]);
+  const [imageAssets, setImageAssets] = useState<AssetRecord[]>([]);
+  const [jsAssets, setJsAssets] = useState<AssetRecord[]>([]);
+  const [otherAssets, setOtherAssets] = useState<AssetRecord[]>([]);
   
   // Get crawl ID from URL parameters
   const crawlId = params?.id;
@@ -38,6 +53,72 @@ export default function Preview() {
     },
     enabled: !!crawlId,
   });
+  
+  // Fetch assets for this crawl
+  const { data: assetPages, isLoading: isLoadingAssets } = useQuery({
+    queryKey: ["/api/pages", crawlId],
+    queryFn: async () => {
+      const response = await fetch(`/api/pages?url=${crawlId}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch pages");
+      }
+      return response.json();
+    },
+    enabled: !!crawlId,
+  });
+  
+  // Process assets when data is loaded
+  useEffect(() => {
+    if (structure && !isLoadingStructure) {
+      const extractAssetsFromStructure = (node: any, path = '') => {
+        const assets: AssetRecord[] = [];
+        
+        if (typeof node !== 'object' || node === null) {
+          return assets;
+        }
+        
+        // Process current level
+        Object.entries(node).forEach(([key, value]: [string, any]) => {
+          const currentPath = path ? `${path}/${key}` : key;
+          
+          if (typeof value === 'object' && value !== null) {
+            if (value.type === 'file' && value.path && value.assetType) {
+              // This is an asset file
+              assets.push({
+                type: value.assetType || 'unknown',
+                path: value.path,
+                url: `/api/assets/${crawlId}/${value.path}`
+              });
+            } else if (value.type === 'file' && value.path) {
+              // This is a page file, ignore
+            } else {
+              // This is a directory, recurse
+              const nestedAssets = extractAssetsFromStructure(value, currentPath);
+              assets.push(...nestedAssets);
+            }
+          } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            // This is a directory, recurse
+            const nestedAssets = extractAssetsFromStructure(value, currentPath);
+            assets.push(...nestedAssets);
+          }
+        });
+        
+        return assets;
+      };
+      
+      // Process the structure to get all assets
+      const allAssets = extractAssetsFromStructure(structure);
+      setAssets(allAssets);
+      
+      // Categorize assets by type
+      setCssAssets(allAssets.filter(asset => asset.type === 'css'));
+      setImageAssets(allAssets.filter(asset => asset.type === 'image'));
+      setJsAssets(allAssets.filter(asset => asset.type === 'js'));
+      setOtherAssets(allAssets.filter(asset => 
+        asset.type !== 'css' && asset.type !== 'image' && asset.type !== 'js'
+      ));
+    }
+  }, [structure, crawlId]);
   
   // Handle page selection
   const handleSelectPage = (page: string) => {
@@ -75,36 +156,165 @@ export default function Preview() {
         <h1 className="text-xl font-semibold">Site Preview</h1>
       </div>
       
-      <div className="grid grid-cols-12 gap-4">
-        {/* Site structure sidebar */}
-        <div className="col-span-3 bg-white rounded-lg shadow overflow-hidden">
-          <div className="p-4 border-b">
-            <h2 className="font-medium">Site Structure</h2>
-          </div>
-          <div className="p-4">
-            {isLoadingStructure ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="preview">Preview Site</TabsTrigger>
+          <TabsTrigger value="assets">Downloaded Assets ({assets.length})</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="preview">
+          <div className="grid grid-cols-12 gap-4">
+            {/* Site structure sidebar */}
+            <div className="col-span-3 bg-white rounded-lg shadow overflow-hidden">
+              <div className="p-4 border-b">
+                <h2 className="font-medium">Site Structure</h2>
               </div>
+              <div className="p-4">
+                {isLoadingStructure ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                  </div>
+                ) : (
+                  <SiteStructure 
+                    siteUrl={`/api/preview/${crawlId}`} 
+                    selectedPage={selectedPage}
+                    onSelectPage={handleSelectPage}
+                  />
+                )}
+              </div>
+            </div>
+            
+            {/* Content preview */}
+            <div className="col-span-9 bg-white rounded-lg shadow">
+              <div className="p-4 border-b">
+                <h2 className="font-medium">Page Preview: {selectedPage}</h2>
+              </div>
+              <div className="border rounded-b-lg h-[600px] overflow-auto">
+                <ReplicatedSitePreview siteUrl={`/api/preview/${crawlId}/${selectedPage}`} />
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="assets">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-medium mb-4">Downloaded Assets</h2>
+            
+            {assets.length === 0 && !isLoadingAssets ? (
+              <Alert>
+                <AlertTitle>No assets found</AlertTitle>
+                <AlertDescription>
+                  No assets were downloaded during the crawl. This might indicate that the crawler was unable to access 
+                  CSS, JavaScript, or image files from the target website.
+                </AlertDescription>
+              </Alert>
             ) : (
-              <SiteStructure 
-                siteUrl={`/api/preview/${crawlId}`} 
-                selectedPage={selectedPage}
-                onSelectPage={handleSelectPage}
-              />
+              <Tabs defaultValue="all">
+                <TabsList>
+                  <TabsTrigger value="all">All ({assets.length})</TabsTrigger>
+                  <TabsTrigger value="css">CSS ({cssAssets.length})</TabsTrigger>
+                  <TabsTrigger value="js">JavaScript ({jsAssets.length})</TabsTrigger>
+                  <TabsTrigger value="images">Images ({imageAssets.length})</TabsTrigger>
+                  <TabsTrigger value="other">Other ({otherAssets.length})</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="all" className="mt-4">
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-12 p-3 bg-gray-50 font-medium text-sm">
+                      <div className="col-span-1">Type</div>
+                      <div className="col-span-11">Path</div>
+                    </div>
+                    <div className="max-h-[500px] overflow-auto">
+                      {assets.map((asset, index) => (
+                        <div key={index} className="grid grid-cols-12 p-3 border-t text-sm hover:bg-gray-50">
+                          <div className="col-span-1 flex items-center">
+                            {asset.type === 'css' ? (
+                              <FileCode className="h-4 w-4 text-blue-500 mr-2" />
+                            ) : asset.type === 'js' ? (
+                              <FileCode className="h-4 w-4 text-yellow-500 mr-2" />
+                            ) : asset.type === 'image' ? (
+                              <Image className="h-4 w-4 text-green-500 mr-2" />
+                            ) : (
+                              <FileType className="h-4 w-4 text-gray-500 mr-2" />
+                            )}
+                            {asset.type}
+                          </div>
+                          <div className="col-span-11 truncate text-blue-600">
+                            {asset.url ? (
+                              <a href={asset.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                {asset.path}
+                              </a>
+                            ) : (
+                              asset.path
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="css" className="mt-4">
+                  <AssetList assets={cssAssets} icon={<FileCode className="h-4 w-4 text-blue-500 mr-2" />} />
+                </TabsContent>
+                
+                <TabsContent value="js" className="mt-4">
+                  <AssetList assets={jsAssets} icon={<FileCode className="h-4 w-4 text-yellow-500 mr-2" />} />
+                </TabsContent>
+                
+                <TabsContent value="images" className="mt-4">
+                  <AssetList assets={imageAssets} icon={<Image className="h-4 w-4 text-green-500 mr-2" />} />
+                </TabsContent>
+                
+                <TabsContent value="other" className="mt-4">
+                  <AssetList assets={otherAssets} icon={<FileType className="h-4 w-4 text-gray-500 mr-2" />} />
+                </TabsContent>
+              </Tabs>
             )}
           </div>
-        </div>
-        
-        {/* Content preview */}
-        <div className="col-span-9 bg-white rounded-lg shadow">
-          <div className="p-4 border-b">
-            <h2 className="font-medium">Page Preview: {selectedPage}</h2>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// Component to display a list of assets
+function AssetList({ assets, icon }: { assets: AssetRecord[], icon: React.ReactNode }) {
+  if (assets.length === 0) {
+    return (
+      <Alert>
+        <AlertTitle>No assets found</AlertTitle>
+        <AlertDescription>
+          No assets of this type were downloaded during the crawl.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <div className="grid grid-cols-12 p-3 bg-gray-50 font-medium text-sm">
+        <div className="col-span-1">Type</div>
+        <div className="col-span-11">Path</div>
+      </div>
+      <div className="max-h-[500px] overflow-auto">
+        {assets.map((asset, index) => (
+          <div key={index} className="grid grid-cols-12 p-3 border-t text-sm hover:bg-gray-50">
+            <div className="col-span-1 flex items-center">
+              {icon}
+              {asset.type}
+            </div>
+            <div className="col-span-11 truncate text-blue-600">
+              {asset.url ? (
+                <a href={asset.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                  {asset.path}
+                </a>
+              ) : (
+                asset.path
+              )}
+            </div>
           </div>
-          <div className="border rounded-b-lg h-[600px] overflow-auto">
-            <ReplicatedSitePreview siteUrl={`/api/preview/${crawlId}/${selectedPage}`} />
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );
