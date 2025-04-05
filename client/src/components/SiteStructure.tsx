@@ -40,8 +40,36 @@ export default function SiteStructure({ siteUrl, selectedPage, onSelectPage }: S
   
   // Update file structure when data is fetched
   useEffect(() => {
-    if (data && data.structure) {
-      setFileStructure(data.structure);
+    if (data) {
+      // Transform the raw data structure into FileNode array
+      const transformDataToFileNodes = (obj: any, basePath = ''): FileNode[] => {
+        return Object.entries(obj).map(([key, value]: [string, any]) => {
+          const currentPath = basePath ? `${basePath}/${key}` : key;
+          
+          if (value.type === 'file') {
+            // It's a file
+            return {
+              type: 'file',
+              name: key,
+              path: value.path || currentPath,
+            };
+          } else {
+            // It's a folder
+            const children = transformDataToFileNodes(value, currentPath);
+            return {
+              type: 'folder',
+              name: key,
+              path: currentPath,
+              children,
+            };
+          }
+        });
+      };
+      
+      console.log('Raw structure data:', data);
+      const structureArray = transformDataToFileNodes(data);
+      console.log('Transformed structure:', structureArray);
+      setFileStructure(structureArray);
       
       // Auto-expand folders with the selected page
       if (selectedPage) {

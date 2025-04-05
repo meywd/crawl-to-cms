@@ -361,15 +361,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/preview/:crawlId/:path(*)", async (req: Request, res: Response) => {
     try {
       const crawlId = parseInt(req.params.crawlId);
-      const pagePath = req.params.path || "index.html";
+      let pagePath = req.params.path || "index.html";
       
       if (isNaN(crawlId)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
       }
 
+      console.log(`Looking for page with crawlId: ${crawlId}, path: ${pagePath}`);
+      
+      // If we're requesting a directory path ending with /, append index.html
+      if (pagePath.endsWith('/')) {
+        pagePath += 'index.html';
+      }
+      
+      // If there's no extension, assume it's a directory and look for index.html
+      if (!pagePath.includes('.')) {
+        pagePath = `${pagePath}/index.html`;
+      }
+
+      // Try to get the page
       const page = await storage.getPageByPath(crawlId, pagePath);
+      
       if (!page) {
-        return res.status(404).json({ message: "Page not found" });
+        console.log(`Page not found at path: ${pagePath}. Trying alternative paths.`);
+        
+        // If not found, try without index.html
+        if (pagePath.endsWith('/index.html')) {
+          const alternativePath = pagePath.substring(0, pagePath.length - 11);
+          const alternativePage = await storage.getPageByPath(crawlId, alternativePath);
+          
+          if (alternativePage) {
+            console.log(`Found page at alternative path: ${alternativePath}`);
+            return res.status(200).send(alternativePage.content);
+          }
+        }
+        
+        return res.status(404).json({ 
+          message: "Page not found", 
+          requestedPath: pagePath 
+        });
       }
 
       // Set content type based on the file extension
@@ -381,6 +411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.setHeader("Content-Type", "application/javascript");
       }
 
+      console.log(`Serving preview for ${pagePath}`);
       return res.status(200).send(page.content);
     } catch (error) {
       console.error("Error serving preview:", error);
@@ -402,6 +433,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Build directory structure
       const structure: any = {};
+      
+      console.log(`Found ${pages.length} pages for crawl ID ${crawlId}`);
       
       // Add pages to structure
       for (const page of pages) {

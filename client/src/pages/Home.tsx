@@ -119,9 +119,9 @@ export default function Home() {
       console.error("Error starting crawl:", error);
       
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      const logs = [{ 
+      const logs: CrawlLog[] = [{ 
         id: Date.now(), 
-        status: "error", 
+        status: "error" as "error" | "info" | "success" | "warning", 
         message: `Error: ${errorMessage}`,
         timestamp: new Date().toISOString()
       }];
