@@ -13,6 +13,7 @@ export default function HistoryPage() {
   // Query to fetch crawl history
   const { data: history = [], isLoading, refetch } = useQuery<any[]>({
     queryKey: ['/api/crawl/history'],
+    staleTime: 10000, // 10 seconds
   });
 
   const handleDeleteCrawl = async (id: string) => {
@@ -70,8 +71,8 @@ export default function HistoryPage() {
                 <CardContent className="p-4">
                   <div className="flex justify-between items-center">
                     <div className="text-sm text-gray-500">
-                      <p>Crawled {new Date(item.createdAt).toLocaleString()}</p>
-                      <p>{item.pageCount} pages | Depth: {item.depth}</p>
+                      <p>Crawled {new Date(item.startedAt).toLocaleString()}</p>
+                      <p>{item.pageCount || 0} pages | Depth: {item.depth}</p>
                     </div>
                     <div className="flex space-x-2">
                       <Button 

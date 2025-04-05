@@ -189,7 +189,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/crawl/history", async (req: Request, res: Response) => {
     try {
+      console.log("Fetching crawl history");
       const crawls = await storage.getCrawlHistory();
+      console.log("Crawl history results:", crawls);
       return res.status(200).json(crawls);
     } catch (error) {
       console.error("Error fetching crawl history:", error);
