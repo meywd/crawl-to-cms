@@ -1,4 +1,4 @@
-import { IStorage } from "./storage";
+import { IStorage } from "./storage_new";
 import { type CrawlOptions } from "@shared/schema";
 import fetch from "node-fetch";
 import * as cheerio from "cheerio";
