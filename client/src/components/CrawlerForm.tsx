@@ -41,7 +41,19 @@ export default function CrawlerForm({ onStartCrawl, isProcessing }: CrawlerFormP
     if (!urlInput.trim()) {
       return;
     }
-    onStartCrawl(urlInput, crawlDepth, options);
+    
+    // Clean and normalize the URL
+    let cleanUrl = urlInput.trim();
+    
+    // Remove 'http://' or 'https://' if the user included it
+    if (cleanUrl.startsWith('http://')) {
+      cleanUrl = cleanUrl.substring(7);
+    } else if (cleanUrl.startsWith('https://')) {
+      cleanUrl = cleanUrl.substring(8);
+    }
+    
+    // Pass the cleaned URL to the parent component
+    onStartCrawl(cleanUrl, crawlDepth, options);
   };
 
   return (

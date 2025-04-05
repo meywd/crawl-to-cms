@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { WebCrawler } from "./crawler";
@@ -13,29 +13,56 @@ import {
   insertSavedSiteSchema
 } from "@shared/schema";
 
+// Helper function to ensure URLs have a protocol
+function ensureHttpProtocol(url: string): string {
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return 'https://' + url;
+  }
+  return url;
+}
+
+// Helper function to validate if a URL is valid
+function isValidUrl(urlString: string): boolean {
+  try {
+    new URL(urlString);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Crawl routes
   app.post("/api/crawl", async (req: Request, res: Response) => {
     try {
-      const { url, depth, options } = insertCrawlSchema
-        .extend({
-          options: crawlOptionsSchema
-        })
-        .parse(req.body);
-
-      // Normalize URL for consistency (protocol handling is done in WebCrawler now)
-      let normalizedUrl = url;
-      if (normalizedUrl.startsWith('http://')) {
-        normalizedUrl = normalizedUrl.substring(7);
-      } else if (normalizedUrl.startsWith('https://')) {
-        normalizedUrl = normalizedUrl.substring(8);
+      console.log("Starting crawl with data:", req.body);
+      
+      // Validate the request data
+      const schema = insertCrawlSchema.extend({
+        options: crawlOptionsSchema
+      });
+      
+      let { url, depth, options } = schema.parse(req.body);
+      
+      // Ensure URL has protocol
+      url = ensureHttpProtocol(url);
+      
+      // Validate URL format
+      if (!isValidUrl(url)) {
+        return res.status(400).json({ 
+          message: "Invalid URL format. Please provide a valid URL." 
+        });
       }
+      
+      console.log(`Processing crawl for URL: ${url}, depth: ${depth}`);
 
       // Check if there's already an active crawl for this URL
+      const normalizedUrl = url.replace(/^https?:\/\//, '');
       const existingCrawl = await storage.getCrawlByUrl(normalizedUrl);
-      if (existingCrawl) {
+      
+      if (existingCrawl && existingCrawl.status === "in_progress") {
         return res.status(409).json({ 
-          message: `A crawl for ${normalizedUrl} is already ${existingCrawl.status}` 
+          message: `A crawl for ${url} is already in progress` 
         });
       }
 

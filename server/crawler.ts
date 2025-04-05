@@ -5,6 +5,24 @@ import * as cheerio from "cheerio";
 import { URL } from "url";
 import path from "path";
 
+// Helper function to ensure URLs have a protocol
+function ensureHttpProtocol(url: string): string {
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return 'https://' + url;
+  }
+  return url;
+}
+
+// Helper function to validate if a URL is valid
+function isValidUrl(urlString: string): boolean {
+  try {
+    new URL(urlString);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 export class WebCrawler {
   private storage: IStorage;
   private crawlQueue: Map<number, Set<string>>;

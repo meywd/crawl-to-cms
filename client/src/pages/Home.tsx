@@ -31,6 +31,10 @@ export default function Home() {
 
   // This function would be called when starting a new crawl
   const handleStartCrawl = async (url: string, depth: number, options: Record<string, boolean>) => {
+    // Add error log for debugging
+    console.log(`Starting crawl for URL: ${url}, depth: ${depth}, options:`, options);
+    
+    // Reset the crawl state
     setCrawlState({
       ...crawlState,
       isProcessing: true,
@@ -44,6 +48,20 @@ export default function Home() {
     });
 
     try {
+      // Log for debugging
+      const logs: CrawlLog[] = [];
+      logs.push({ 
+        id: Date.now(), 
+        status: "info", 
+        message: `Starting crawl for ${url}...`,
+        timestamp: new Date().toISOString()
+      });
+      
+      setCrawlState(prev => ({
+        ...prev,
+        crawlLogs: logs
+      }));
+      
       // Call the API to start the crawl
       const response = await fetch("/api/crawl", {
         method: "POST",
@@ -53,20 +71,58 @@ export default function Home() {
         body: JSON.stringify({ url, depth, options }),
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        throw new Error("Failed to start crawl");
+        logs.push({ 
+          id: Date.now(), 
+          status: "error", 
+          message: data.message || "Failed to start crawl",
+          timestamp: new Date().toISOString()
+        });
+        
+        setCrawlState(prev => ({
+          ...prev,
+          isProcessing: false,
+          crawlStatus: "error",
+          crawlLogs: logs
+        }));
+        
+        return;
       }
-
+      
+      logs.push({ 
+        id: Date.now(), 
+        status: "success", 
+        message: "Crawl started successfully",
+        timestamp: new Date().toISOString()
+      });
+      
+      setCrawlState(prev => ({
+        ...prev,
+        crawlLogs: logs
+      }));
+      
       // In a real app, we would then poll for status updates
       // For demo purposes, we'll simulate progress
       simulateCrawlProgress();
     } catch (error) {
       console.error("Error starting crawl:", error);
-      setCrawlState({
-        ...crawlState,
+      
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const logs = [{ 
+        id: Date.now(), 
+        status: "error", 
+        message: `Error: ${errorMessage}`,
+        timestamp: new Date().toISOString()
+      }];
+      
+      setCrawlState(prev => ({
+        ...prev,
         isProcessing: false,
         crawlStatus: "error",
-      });
+        crawlLogs: logs
+      }));
     }
   };
 
@@ -74,9 +130,24 @@ export default function Home() {
   const simulateCrawlProgress = () => {
     // This would be replaced with actual polling in production
     const mockLogs: CrawlLog[] = [
-      { id: 1, status: "success", message: "Crawled: homepage" },
-      { id: 2, status: "success", message: "Crawled: about page" },
-      { id: 3, status: "success", message: "Crawled: services page" }
+      { 
+        id: Date.now() + 1, 
+        status: "success", 
+        message: "Crawled: homepage",
+        timestamp: new Date().toISOString()
+      },
+      { 
+        id: Date.now() + 2, 
+        status: "success", 
+        message: "Crawled: about page",
+        timestamp: new Date().toISOString()
+      },
+      { 
+        id: Date.now() + 3, 
+        status: "success", 
+        message: "Crawled: services page",
+        timestamp: new Date().toISOString()
+      }
     ];
 
     let progress = 0;
@@ -84,24 +155,44 @@ export default function Home() {
       progress += 5;
       if (progress <= 100) {
         const crawledPages = Math.floor((progress / 100) * 20);
-        setCrawlState({
-          ...crawlState,
-          crawlProgress: progress,
-          crawledPages,
-          totalPages: 20,
-          crawlLogs: mockLogs.slice(0, Math.min(crawledPages, mockLogs.length)),
+        setCrawlState(prev => {
+          // Get existing logs and append new ones
+          const currentLogs = [...prev.crawlLogs];
+          
+          // Add mock logs based on progress
+          const mockLogsToAdd = mockLogs.slice(0, Math.min(crawledPages, mockLogs.length))
+            .filter(log => !currentLogs.some(existingLog => existingLog.id === log.id));
+          
+          return {
+            ...prev,
+            crawlProgress: progress,
+            crawledPages,
+            totalPages: 20,
+            crawlLogs: [...currentLogs, ...mockLogsToAdd],
+          };
         });
       } else {
         clearInterval(interval);
-        setCrawlState(prev => ({
-          ...prev,
-          isProcessing: false,
-          crawlStatus: "completed",
-          crawlProgress: 100,
-          crawledPages: 20,
-          totalPages: 20,
-          previewReady: true,
-        }));
+        setCrawlState(prev => {
+          // Add completion log
+          const completionLog = { 
+            id: Date.now(), 
+            status: "success" as const, 
+            message: "Crawl completed successfully",
+            timestamp: new Date().toISOString()
+          };
+          
+          return {
+            ...prev,
+            isProcessing: false,
+            crawlStatus: "completed",
+            crawlProgress: 100,
+            crawledPages: 20,
+            totalPages: 20,
+            previewReady: true,
+            crawlLogs: [...prev.crawlLogs, completionLog],
+          };
+        });
       }
     }, 500);
   };
