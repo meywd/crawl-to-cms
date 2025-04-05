@@ -11,7 +11,7 @@ export default function SavedSitesPage() {
   const [, setLocation] = useLocation();
   
   // Query to fetch saved sites
-  const { data: savedSites, isLoading } = useQuery({
+  const { data: savedSites = [], isLoading, refetch } = useQuery<any[]>({
     queryKey: ['/api/sites/saved'],
   });
 
@@ -26,8 +26,8 @@ export default function SavedSitesPage() {
         description: "The saved site has been deleted",
       });
       
-      // Invalidate the saved sites query to refresh the list
-      // This would be implemented in a real application
+      // Refresh the saved sites list
+      refetch();
     } catch (error) {
       toast({
         title: "Error",

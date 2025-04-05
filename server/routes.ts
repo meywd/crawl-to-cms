@@ -23,24 +23,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .parse(req.body);
 
+      // Normalize URL for consistency (protocol handling is done in WebCrawler now)
+      let normalizedUrl = url;
+      if (normalizedUrl.startsWith('http://')) {
+        normalizedUrl = normalizedUrl.substring(7);
+      } else if (normalizedUrl.startsWith('https://')) {
+        normalizedUrl = normalizedUrl.substring(8);
+      }
+
       // Check if there's already an active crawl for this URL
-      const existingCrawl = await storage.getCrawlByUrl(url);
+      const existingCrawl = await storage.getCrawlByUrl(normalizedUrl);
       if (existingCrawl) {
         return res.status(409).json({ 
-          message: `A crawl for ${url} is already ${existingCrawl.status}` 
+          message: `A crawl for ${normalizedUrl} is already ${existingCrawl.status}` 
         });
       }
 
-      // Create a new crawl
+      // Create a new crawl with the normalized URL
       const crawl = await storage.createCrawl({
-        url,
+        url: normalizedUrl,
         depth,
         options
       });
 
       // Start the crawl process asynchronously
       const crawler = new WebCrawler(storage);
-      crawler.startCrawl(crawl.id, url, depth, options).catch(err => {
+      crawler.startCrawl(crawl.id, normalizedUrl, depth, options).catch(err => {
         console.error("Crawl error:", err);
       });
 
@@ -158,6 +166,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(200).json(crawls);
     } catch (error) {
       console.error("Error fetching crawl history:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Route to delete crawl history
+  app.delete("/api/crawl/history/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid crawl ID" });
+      }
+
+      // There's no explicit delete method in our storage interface,
+      // so we'll just mark it as cancelled
+      const crawl = await storage.getCrawl(id);
+      if (!crawl) {
+        return res.status(404).json({ message: "Crawl not found" });
+      }
+      
+      await storage.updateCrawlStatus(id, "cancelled");
+      return res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting crawl:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   });

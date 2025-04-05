@@ -27,6 +27,11 @@ export class WebCrawler {
     options: CrawlOptions
   ): Promise<void> {
     try {
+      // Ensure URL has a protocol
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+      
       // Initialize the crawl data structures
       this.crawlQueue.set(crawlId, new Set([url]));
       this.crawledUrls.set(crawlId, new Set());
@@ -67,8 +72,14 @@ export class WebCrawler {
       throw new Error(`Crawl ${crawlId} not found`);
     }
     
+    // Ensure URL has a protocol
+    let url = crawl.url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+    
     // Resume the crawl
-    await this.processCrawl(crawlId, crawl.url, crawl.depth, crawl.options as CrawlOptions);
+    await this.processCrawl(crawlId, url, crawl.depth, crawl.options as CrawlOptions);
   }
 
   private async processCrawl(

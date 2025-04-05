@@ -11,7 +11,7 @@ export default function HistoryPage() {
   const [, setLocation] = useLocation();
   
   // Query to fetch crawl history
-  const { data: history, isLoading } = useQuery({
+  const { data: history = [], isLoading, refetch } = useQuery<any[]>({
     queryKey: ['/api/crawl/history'],
   });
 
@@ -26,8 +26,8 @@ export default function HistoryPage() {
         description: "The crawl has been removed from history",
       });
       
-      // Invalidate the history query to refresh the list
-      // This would be implemented in a real application
+      // Refresh the history list
+      refetch();
     } catch (error) {
       toast({
         title: "Error",
