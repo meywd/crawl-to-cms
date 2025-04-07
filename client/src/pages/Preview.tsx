@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Home, ArrowLeft, FileType, Image, FileCode, FileText, Download, Archive } from "lucide-react";
+import { Loader2, Home, ArrowLeft, FileType, Image, FileCode, FileText, Download, Archive, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -162,7 +162,48 @@ export default function Preview() {
             Back to History
           </Button>
         </div>
-        <h1 className="text-xl font-semibold">Site Preview</h1>
+        <div className="flex items-center gap-2">
+          <Button 
+            className="bg-primary hover:bg-blue-700 text-white"
+            onClick={async () => {
+              try {
+                // Call the API to save the site
+                const response = await fetch("/api/sites/save", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ crawlId }),
+                });
+                
+                if (!response.ok) {
+                  throw new Error("Failed to save site");
+                }
+                
+                const savedSite = await response.json();
+                
+                toast({
+                  title: "Site saved successfully",
+                  description: "You can view it in the Saved Sites tab",
+                });
+                
+                // Navigate to saved sites page
+                setLocation("/saved-sites");
+              } catch (error) {
+                console.error("Error saving site:", error);
+                toast({
+                  title: "Error",
+                  description: "Failed to save site",
+                  variant: "destructive",
+                });
+              }
+            }}
+          >
+            <Database className="h-4 w-4 mr-2" />
+            Save Site
+          </Button>
+          <h1 className="text-xl font-semibold">Site Preview</h1>
+        </div>
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
