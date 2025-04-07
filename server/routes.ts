@@ -397,7 +397,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Saved sites routes
   app.post("/api/sites/save", async (req: Request, res: Response) => {
     try {
-      const { crawlId, name } = insertSavedSiteSchema.parse(req.body);
+      // Parse the crawlId as a number since it might come as a string from the client
+      let { crawlId, name } = req.body;
+      crawlId = parseInt(crawlId, 10);
+      
+      if (isNaN(crawlId)) {
+        return res.status(400).json({ message: "Invalid crawlId, must be a number" });
+      }
 
       const crawl = await storage.getCrawl(crawlId);
       if (!crawl) {

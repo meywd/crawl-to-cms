@@ -17,6 +17,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import ReplicatedSitePreview from "@/components/ReplicatedSitePreview";
 import SiteStructure from "@/components/SiteStructure";
+import { saveSite } from "@/lib/api";
 
 // Asset types for display
 type AssetRecord = {
@@ -167,20 +168,8 @@ export default function Preview() {
             className="bg-primary hover:bg-blue-700 text-white"
             onClick={async () => {
               try {
-                // Call the API to save the site
-                const response = await fetch("/api/sites/save", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({ crawlId }),
-                });
-                
-                if (!response.ok) {
-                  throw new Error("Failed to save site");
-                }
-                
-                const savedSite = await response.json();
+                // Use the API saveSite function
+                await saveSite(crawlId);
                 
                 toast({
                   title: "Site saved successfully",

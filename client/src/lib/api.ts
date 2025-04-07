@@ -50,7 +50,13 @@ export async function getPagesByUrl(url: string): Promise<Page[]> {
 
 // Saved sites API functions
 export async function saveSite(crawlId: string, name?: string): Promise<SavedSite> {
-  const response = await apiRequest("POST", "/api/sites/save", { crawlId, name });
+  // Convert crawlId to a number for the server
+  const numericCrawlId = parseInt(crawlId, 10);
+  if (isNaN(numericCrawlId)) {
+    throw new Error("Invalid crawl ID");
+  }
+  
+  const response = await apiRequest("POST", "/api/sites/save", { crawlId: numericCrawlId, name });
   return response.json();
 }
 
