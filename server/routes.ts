@@ -89,25 +89,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/crawl/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid crawl ID" });
-      }
-
-      const crawl = await storage.getCrawl(id);
-      if (!crawl) {
-        return res.status(404).json({ message: "Crawl not found" });
-      }
-
-      return res.status(200).json(crawl);
-    } catch (error) {
-      console.error("Error fetching crawl:", error);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
   app.post("/api/crawl/:id/pause", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
@@ -187,6 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // This route needs to be before the /api/crawl/:id route to avoid conflict
   app.get("/api/crawl/history", async (req: Request, res: Response) => {
     try {
       console.log("Fetching crawl history");
@@ -195,6 +177,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(200).json(crawls);
     } catch (error) {
       console.error("Error fetching crawl history:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // This route must be after the /api/crawl/history route
+  app.get("/api/crawl/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid crawl ID" });
+      }
+
+      const crawl = await storage.getCrawl(id);
+      if (!crawl) {
+        return res.status(404).json({ message: "Crawl not found" });
+      }
+
+      return res.status(200).json(crawl);
+    } catch (error) {
+      console.error("Error fetching crawl:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   });
