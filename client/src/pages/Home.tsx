@@ -225,85 +225,55 @@ export default function Home() {
 
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
-      <Tabs defaultValue="crawler">
-        <div className="border-b border-gray-200">
-          <TabsList className="flex">
-            <TabsTrigger 
-              value="crawler"
-              className="text-sm flex items-center py-4 px-6 focus:outline-none"
-            >
-              <Globe className="h-4 w-4 mr-2" />
-              Crawler
-            </TabsTrigger>
-            <TabsTrigger 
-              value="history"
-              className="text-sm flex items-center py-4 px-6 focus:outline-none"
-              onClick={() => setLocation("/history")}
-            >
-              <History className="h-4 w-4 mr-2" />
-              History
-            </TabsTrigger>
-            <TabsTrigger 
-              value="saved"
-              className="text-sm flex items-center py-4 px-6 focus:outline-none"
-              onClick={() => setLocation("/saved-sites")}
-            >
-              <Database className="h-4 w-4 mr-2" />
-              Saved Sites
-            </TabsTrigger>
-          </TabsList>
-        </div>
-
-        <TabsContent value="crawler" className="p-6">
-          <CrawlerForm 
-            onStartCrawl={handleStartCrawl} 
-            isProcessing={crawlState.isProcessing}
+      <div className="p-6">
+        <CrawlerForm 
+          onStartCrawl={handleStartCrawl} 
+          isProcessing={crawlState.isProcessing}
+        />
+        
+        {crawlState.isProcessing && (
+          <CrawlProgress
+            progress={crawlState.crawlProgress}
+            status={crawlState.crawlStatus}
+            crawledPages={crawlState.crawledPages}
+            totalPages={crawlState.totalPages}
+            logs={crawlState.crawlLogs}
+            onPause={handlePauseCrawl}
+            onCancel={handleCancelCrawl}
           />
-          
-          {crawlState.isProcessing && (
-            <CrawlProgress
-              progress={crawlState.crawlProgress}
-              status={crawlState.crawlStatus}
-              crawledPages={crawlState.crawledPages}
-              totalPages={crawlState.totalPages}
-              logs={crawlState.crawlLogs}
-              onPause={handlePauseCrawl}
-              onCancel={handleCancelCrawl}
-            />
-          )}
-          
-          {crawlState.previewReady && (
-            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center mb-4">
-                <div className="flex-shrink-0 bg-green-100 p-2 rounded-full">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-lg font-medium text-green-800">Crawl completed!</h3>
-                  <p className="text-sm text-green-700">Your site replica is ready to be viewed</p>
-                </div>
+        )}
+        
+        {crawlState.previewReady && (
+          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center mb-4">
+              <div className="flex-shrink-0 bg-green-100 p-2 rounded-full">
+                <CheckCircle className="h-5 w-5 text-green-500" />
               </div>
-              <div className="flex gap-3">
-                <Button 
-                  onClick={() => setLocation(`/preview/${crawlId}`)} 
-                  variant="default"
-                  className="bg-green-500 hover:bg-green-600"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View Replica
-                </Button>
-                <Button 
-                  onClick={() => setLocation("/history")} 
-                  variant="outline"
-                >
-                  <History className="h-4 w-4 mr-2" />
-                  View in History
-                </Button>
+              <div className="ml-3">
+                <h3 className="text-lg font-medium text-green-800">Crawl completed!</h3>
+                <p className="text-sm text-green-700">Your site replica is ready to be viewed</p>
               </div>
             </div>
-          )}
-        </TabsContent>
-      </Tabs>
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => setLocation(`/preview/${crawlId}`)} 
+                variant="default"
+                className="bg-green-500 hover:bg-green-600"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                View Replica
+              </Button>
+              <Button 
+                onClick={() => setLocation("/history")} 
+                variant="outline"
+              >
+                <History className="h-4 w-4 mr-2" />
+                View in History
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
