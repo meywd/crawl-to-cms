@@ -46,7 +46,9 @@ export interface CrawlOptions {
 // Saved site
 export interface SavedSite {
   id: string;
+  crawlId: string; // Added crawlId to match server schema
   url: string;
+  name?: string;  // Added name which is in the schema
   pageCount: number;
   size: number;
   savedAt: string;
