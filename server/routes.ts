@@ -903,46 +903,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid saved site ID" });
+        return res.status(400).json({ message: "Invalid crawl ID" });
       }
 
-      const savedSite = await storage.getSavedSite(id);
-      if (!savedSite) {
-        return res.status(404).json({ message: "Saved site not found" });
+      // Check if we're filtering by asset type
+      const assetType = req.query.type as string | undefined;
+      
+      // Get crawl directly (not saved site) - this allows downloading assets for any crawl
+      const crawl = await storage.getCrawl(id);
+      if (!crawl) {
+        // Try to find it as a saved site as fallback
+        const savedSite = await storage.getSavedSite(id);
+        if (!savedSite) {
+          return res.status(404).json({ message: "Crawl or saved site not found" });
+        }
+        // Use the crawl ID from the saved site
+        const crawlForSavedSite = await storage.getCrawl(savedSite.crawlId);
+        if (!crawlForSavedSite) {
+          return res.status(404).json({ message: "Crawl not found for saved site" });
+        }
       }
 
-      // Get all pages and assets for this crawl
-      const pages = await storage.getPagesByCrawlId(savedSite.crawlId);
-      const assets = await storage.getAssetsByCrawlId(savedSite.crawlId);
+      // Get all pages for this crawl
+      const pages = await storage.getPagesByCrawlId(id);
+      
+      // Get assets, potentially filtered by type
+      let assets = await storage.getAssetsByCrawlId(id);
+      
+      // Filter assets by type if requested
+      if (assetType) {
+        assets = assets.filter(asset => asset.type === assetType);
+      }
 
+      // Get site URL from crawl or from a page
+      const siteUrl = crawl ? crawl.url : (pages.length > 0 ? new URL(pages[0].url).hostname : 'site');
+      
+      // Generate a readable title based on the asset type (if filtered)
+      const typeTitle = assetType 
+        ? `${assetType.charAt(0).toUpperCase() + assetType.slice(1)} Files` 
+        : 'Complete Site';
+      
       // This would normally generate a zip file with all content
       // For this demo, we'll just return a simple HTML listing
       let html = `<!DOCTYPE html>
       <html>
       <head>
-        <title>Downloaded Site: ${savedSite.url}</title>
+        <title>Downloaded ${typeTitle}: ${siteUrl}</title>
         <style>
           body { font-family: sans-serif; padding: 20px; }
           h1 { color: #2563eb; }
           ul { list-style-type: none; padding: 0; }
           li { margin: 8px 0; padding: 8px; border-bottom: 1px solid #eee; }
+          .asset-type { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin-right: 8px; }
+          .css { background: #e6f2ff; color: #0066cc; }
+          .js { background: #fff9e6; color: #cc9900; }
+          .image { background: #e6ffec; color: #00994d; }
+          .other { background: #f2f2f2; color: #666666; }
         </style>
       </head>
       <body>
-        <h1>Downloaded Site: ${savedSite.url}</h1>
-        <h2>Pages (${pages.length})</h2>
+        <h1>Downloaded ${typeTitle}: ${siteUrl}</h1>
+        ${!assetType ? `<h2>Pages (${pages.length})</h2>
         <ul>
           ${pages.map(page => `<li>${page.path}</li>`).join('')}
-        </ul>
+        </ul>` : ''}
         <h2>Assets (${assets.length})</h2>
         <ul>
-          ${assets.map(asset => `<li>${asset.path} (${asset.type})</li>`).join('')}
+          ${assets.map(asset => `
+            <li>
+              <span class="asset-type ${asset.type}">${asset.type}</span>
+              ${asset.path}
+            </li>`).join('')}
         </ul>
       </body>
       </html>`;
 
+      const filename = assetType 
+        ? `${siteUrl.replace(/[^a-z0-9]/gi, '_')}_${assetType}.html` 
+        : `${siteUrl.replace(/[^a-z0-9]/gi, '_')}.html`;
+      
       res.setHeader('Content-Type', 'text/html');
-      res.setHeader('Content-Disposition', `attachment; filename="${savedSite.url.replace(/[^a-z0-9]/gi, '_')}.html"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       return res.status(200).send(html);
     } catch (error) {
       console.error("Error downloading site:", error);

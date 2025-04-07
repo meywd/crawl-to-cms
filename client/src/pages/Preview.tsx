@@ -1,11 +1,20 @@
 import { useEffect, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Home, ArrowLeft, FileType, Image, FileCode, FileText } from "lucide-react";
+import { Loader2, Home, ArrowLeft, FileType, Image, FileCode, FileText, Download, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import { toast } from "@/hooks/use-toast";
 import ReplicatedSitePreview from "@/components/ReplicatedSitePreview";
 import SiteStructure from "@/components/SiteStructure";
 
@@ -198,7 +207,70 @@ export default function Preview() {
         
         <TabsContent value="assets">
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-medium mb-4">Downloaded Assets</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-medium">Downloaded Assets</h2>
+              
+              {assets.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Assets
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Download Options</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => {
+                      window.open(`/api/sites/download/${crawlId}`, '_blank');
+                      toast({
+                        title: "Download started",
+                        description: "Your assets are being prepared for download."
+                      });
+                    }}>
+                      <Archive className="h-4 w-4 mr-2" />
+                      Download All as ZIP
+                    </DropdownMenuItem>
+                    {cssAssets.length > 0 && (
+                      <DropdownMenuItem onClick={() => {
+                        window.open(`/api/sites/download/${crawlId}?type=css`, '_blank');
+                        toast({
+                          title: "Download started",
+                          description: "CSS files are being prepared for download."
+                        });
+                      }}>
+                        <FileCode className="h-4 w-4 text-blue-500 mr-2" />
+                        Download CSS Files
+                      </DropdownMenuItem>
+                    )}
+                    {jsAssets.length > 0 && (
+                      <DropdownMenuItem onClick={() => {
+                        window.open(`/api/sites/download/${crawlId}?type=js`, '_blank');
+                        toast({
+                          title: "Download started",
+                          description: "JavaScript files are being prepared for download."
+                        });
+                      }}>
+                        <FileCode className="h-4 w-4 text-yellow-500 mr-2" />
+                        Download JavaScript Files
+                      </DropdownMenuItem>
+                    )}
+                    {imageAssets.length > 0 && (
+                      <DropdownMenuItem onClick={() => {
+                        window.open(`/api/sites/download/${crawlId}?type=image`, '_blank');
+                        toast({
+                          title: "Download started",
+                          description: "Image files are being prepared for download."
+                        });
+                      }}>
+                        <Image className="h-4 w-4 text-green-500 mr-2" />
+                        Download Image Files
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
             
             {assets.length === 0 && !isLoadingAssets ? (
               <Alert>
@@ -222,7 +294,8 @@ export default function Preview() {
                   <div className="border rounded-lg overflow-hidden">
                     <div className="grid grid-cols-12 p-3 bg-gray-50 font-medium text-sm">
                       <div className="col-span-1">Type</div>
-                      <div className="col-span-11">Path</div>
+                      <div className="col-span-10">Path</div>
+                      <div className="col-span-1 text-center">Action</div>
                     </div>
                     <div className="max-h-[500px] overflow-auto">
                       {assets.map((asset, index) => (
@@ -239,13 +312,47 @@ export default function Preview() {
                             )}
                             {asset.type}
                           </div>
-                          <div className="col-span-11 truncate text-blue-600">
+                          <div className="col-span-10 truncate text-blue-600">
                             {asset.url ? (
                               <a href={asset.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
                                 {asset.path}
                               </a>
                             ) : (
                               asset.path
+                            )}
+                          </div>
+                          <div className="col-span-1 flex justify-center">
+                            {asset.url && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 w-8 p-0"
+                                onClick={() => {
+                                  // For images, download directly
+                                  if (asset.type === 'image' && asset.url) {
+                                    // Extract file name from path
+                                    const fileName = asset.path.split('/').pop() || 'download.jpg';
+                                    
+                                    // Create download link
+                                    const link = document.createElement('a');
+                                    link.href = asset.url;
+                                    link.download = fileName;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    
+                                    toast({
+                                      title: "Downloading file",
+                                      description: `Downloading ${fileName}`
+                                    });
+                                  } else if (asset.url) {
+                                    // For other asset types, open in new tab
+                                    window.open(asset.url, '_blank');
+                                  }
+                                }}
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
                             )}
                           </div>
                         </div>
@@ -295,7 +402,8 @@ function AssetList({ assets, icon }: { assets: AssetRecord[], icon: React.ReactN
     <div className="border rounded-lg overflow-hidden">
       <div className="grid grid-cols-12 p-3 bg-gray-50 font-medium text-sm">
         <div className="col-span-1">Type</div>
-        <div className="col-span-11">Path</div>
+        <div className="col-span-10">Path</div>
+        <div className="col-span-1 text-center">Action</div>
       </div>
       <div className="max-h-[500px] overflow-auto">
         {assets.map((asset, index) => (
@@ -304,13 +412,47 @@ function AssetList({ assets, icon }: { assets: AssetRecord[], icon: React.ReactN
               {icon}
               {asset.type}
             </div>
-            <div className="col-span-11 truncate text-blue-600">
+            <div className="col-span-10 truncate text-blue-600">
               {asset.url ? (
                 <a href={asset.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
                   {asset.path}
                 </a>
               ) : (
                 asset.path
+              )}
+            </div>
+            <div className="col-span-1 flex justify-center">
+              {asset.url && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0"
+                  onClick={() => {
+                    // For images, download directly
+                    if (asset.type === 'image' && asset.url) {
+                      // Extract file name from path
+                      const fileName = asset.path.split('/').pop() || 'download.jpg';
+                      
+                      // Create download link
+                      const link = document.createElement('a');
+                      link.href = asset.url;
+                      link.download = fileName;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      
+                      toast({
+                        title: "Downloading file",
+                        description: `Downloading ${fileName}`
+                      });
+                    } else if (asset.url) {
+                      // For other asset types, open in new tab
+                      window.open(asset.url, '_blank');
+                    }
+                  }}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
               )}
             </div>
           </div>
