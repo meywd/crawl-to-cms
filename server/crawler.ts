@@ -29,6 +29,54 @@ export class WebCrawler {
   private crawledUrls: Map<number, Set<string>>;
   private paused: Set<number>;
   private cancelled: Set<number>;
+  
+  // Helper method to get full-sized image URLs by removing format/size parameters
+  private getFullSizeImageUrl(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      
+      // Remove common image resizing parameters from various CDNs
+      
+      // Squarespace and related CDNs
+      if (url.includes('squarespace-cdn.com') || url.includes('sqspcdn.com') || url.includes('squarespace.com')) {
+        // Remove format parameter that often limits size
+        urlObj.searchParams.delete('format');
+        
+        // If there's a size indicator like "=100w", "=1000w", etc., remove it
+        const path = urlObj.pathname;
+        if (path.match(/=\d+w$/)) {
+          urlObj.pathname = path.replace(/=\d+w$/, '');
+        }
+      }
+      
+      // WordPress and similar platforms
+      if (url.includes('wp-content') || url.includes('wordpress')) {
+        // Remove common sizing parameters like -150x150, -300x200, etc.
+        const path = urlObj.pathname;
+        urlObj.pathname = path.replace(/-\d+x\d+(\.[a-zA-Z]+)$/, '$1');
+      }
+      
+      // Shopify
+      if (url.includes('shopify.com') || url.includes('cdn.shopify.com')) {
+        // Remove _100x, _large, _medium, etc. parts
+        const path = urlObj.pathname;
+        urlObj.pathname = path.replace(/(_small|_medium|_large|_grande|_\d+x)/, '');
+      }
+      
+      // Cloudinary
+      if (url.includes('cloudinary.com') || url.includes('res.cloudinary.com')) {
+        // Remove transformation parameters like w_100,h_100,c_fit/
+        const path = urlObj.pathname;
+        urlObj.pathname = path.replace(/\/[^\/]*(w_\d+|h_\d+|c_\w+)[^\/]*\//, '/');
+      }
+      
+      return urlObj.toString();
+    } catch (error) {
+      // If any error occurs, return the original URL
+      console.warn(`Error cleaning image URL ${url}:`, error);
+      return url;
+    }
+  }
 
   constructor(storage: IStorage) {
     this.storage = storage;
@@ -175,15 +223,44 @@ export class WebCrawler {
             }
           }
         } else if (options.downloadImages && contentType.includes("image/")) {
-          // Process image
-          const arrayBuffer = await response.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
+          // Process image, getting full-sized version by removing resize parameters 
+          const fullSizeUrl = this.getFullSizeImageUrl(currentUrl);
+          
+          // If the full-size URL is different, fetch it instead
+          let finalUrl = currentUrl;
+          let buffer: Buffer;
+          
+          if (fullSizeUrl !== currentUrl) {
+            console.log(`Using full-sized image URL: ${fullSizeUrl} instead of ${currentUrl}`);
+            try {
+              const fullSizeResponse = await fetch(fullSizeUrl);
+              if (fullSizeResponse.ok) {
+                const fullSizeArrayBuffer = await fullSizeResponse.arrayBuffer();
+                buffer = Buffer.from(fullSizeArrayBuffer);
+                finalUrl = fullSizeUrl;
+              } else {
+                // Fall back to original URL if full-size request fails
+                console.warn(`Failed to fetch full-sized image, falling back to original URL`);
+                const arrayBuffer = await response.arrayBuffer();
+                buffer = Buffer.from(arrayBuffer);
+              }
+            } catch (error) {
+              console.warn(`Error fetching full-sized image: ${error}, falling back to original URL`);
+              const arrayBuffer = await response.arrayBuffer();
+              buffer = Buffer.from(arrayBuffer);
+            }
+          } else {
+            // Use the original response if URLs are the same
+            const arrayBuffer = await response.arrayBuffer();
+            buffer = Buffer.from(arrayBuffer);
+          }
+          
           const assetPath = this.getAssetPath(currentUrl, baseUrl);
           
-          console.log(`Saving image: ${currentUrl} -> ${assetPath}`);
+          console.log(`Saving image: ${finalUrl} -> ${assetPath}`);
           await this.storage.createAsset({
             crawlId,
-            url: currentUrl,
+            url: finalUrl,
             path: assetPath,
             type: "image",
             content: buffer.toString("base64") // Store as base64
@@ -426,13 +503,15 @@ export class WebCrawler {
         if (src) {
           try {
             const absoluteUrl = new URL(src, url).toString();
+            // Get the full-sized image URL by removing resize parameters
+            const fullSizeUrl = this.getFullSizeImageUrl(absoluteUrl);
             const assetPath = this.getAssetPath(absoluteUrl, baseUrl);
             $(el).attr('src', `/api/assets/${crawlId}/${assetPath}`);
             console.log(`Replaced image src: ${src} -> /api/assets/${crawlId}/${assetPath}`);
             
-            // Queue image for download
+            // Queue full-sized image for download
             resourcesToDownload.push({
-              url: absoluteUrl,
+              url: fullSizeUrl,
               type: 'image',
               assetPath
             });
@@ -445,11 +524,13 @@ export class WebCrawler {
                 const [imgUrl, size] = srcSetPart.trim().split(/\s+/);
                 try {
                   const absoluteSrcSetUrl = new URL(imgUrl, url).toString();
+                  // Get full-sized image URL by removing resize parameters
+                  const fullSizeUrl = this.getFullSizeImageUrl(absoluteSrcSetUrl);
                   const srcSetAssetPath = this.getAssetPath(absoluteSrcSetUrl, baseUrl);
                   
-                  // Queue srcset image for download
+                  // Queue full-sized srcset image for download
                   resourcesToDownload.push({
-                    url: absoluteSrcSetUrl,
+                    url: fullSizeUrl,
                     type: 'image',
                     assetPath: srcSetAssetPath
                   });
@@ -479,11 +560,13 @@ export class WebCrawler {
               const [imgUrl, size] = srcSetPart.trim().split(/\s+/);
               try {
                 const absoluteSrcSetUrl = new URL(imgUrl, url).toString();
+                // Get full-sized image URL by removing resize parameters
+                const fullSizeUrl = this.getFullSizeImageUrl(absoluteSrcSetUrl);
                 const srcSetAssetPath = this.getAssetPath(absoluteSrcSetUrl, baseUrl);
                 
-                // Queue picture source image for download
+                // Queue full-sized picture source image for download
                 resourcesToDownload.push({
-                  url: absoluteSrcSetUrl,
+                  url: fullSizeUrl,
                   type: 'image',
                   assetPath: srcSetAssetPath
                 });
@@ -512,11 +595,13 @@ export class WebCrawler {
             if (resourceUrl && !resourceUrl.startsWith('data:')) {
               try {
                 const absoluteUrl = new URL(resourceUrl, url).toString();
+                // Get full-sized image URL by removing resize parameters
+                const fullSizeUrl = this.getFullSizeImageUrl(absoluteUrl);
                 const assetPath = this.getAssetPath(absoluteUrl, baseUrl);
                 
-                // Queue background image for download
+                // Queue full-sized background image for download
                 resourcesToDownload.push({
-                  url: absoluteUrl,
+                  url: fullSizeUrl,
                   type: 'image',
                   assetPath
                 });
@@ -680,10 +765,16 @@ export class WebCrawler {
                     const absoluteUrl = new URL(resourceUrl, resource.url).toString();
                     const assetPath = this.getAssetPath(absoluteUrl, baseUrl);
                     
+                    // Check if this is an image resource
+                    const isImage = resourceUrl.match(/\.(jpg|jpeg|png|gif|svg|webp|ico)$/i) ? true : false;
+                    
+                    // If it's an image, use the full size URL
+                    const urlToDownload = isImage ? this.getFullSizeImageUrl(absoluteUrl) : absoluteUrl;
+                    
                     // Queue this nested resource for download in the next batch
                     resourcesToDownload.push({
-                      url: absoluteUrl,
-                      type: resourceUrl.match(/\.(jpg|jpeg|png|gif|svg|webp|ico)$/i) ? 'image' : 'other',
+                      url: urlToDownload,
+                      type: isImage ? 'image' : 'other',
                       assetPath
                     });
                     

@@ -1216,12 +1216,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add info.html to the zip
       zip.file("info.html", infoHtml);
       
-      // Create folders for different asset types
-      const pagesFolder = zip.folder("pages");
-      const cssFolder = zip.folder("css");
-      const jsFolder = zip.folder("js");
-      const imagesFolder = zip.folder("images");
-      const otherFolder = zip.folder("other");
+      // Create folders for different asset types - JSZip.folder() should never return null with valid inputs
+      // Using non-null assertion to tell TypeScript these will always exist
+      const pagesFolder = zip.folder("pages")!;
+      const cssFolder = zip.folder("css")!;
+      const jsFolder = zip.folder("js")!;
+      const imagesFolder = zip.folder("images")!;
+      const otherFolder = zip.folder("other")!;
       
       // Add HTML pages to the zip
       if (!assetType) {
