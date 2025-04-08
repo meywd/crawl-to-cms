@@ -1123,17 +1123,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if we're filtering by asset type
       const assetType = req.query.type as string | undefined;
       
-      // Get crawl directly (not saved site) - this allows downloading assets for any crawl
-      let crawl = await storage.getCrawl(id);
-      let crawlId = id;
+      // Check if this is a saved site ID first
+      const savedSite = await storage.getSavedSite(id);
+      let crawl;
+      let crawlId;
       
-      if (!crawl) {
-        // Try to find it as a saved site as fallback
-        const savedSite = await storage.getSavedSite(id);
-        if (!savedSite) {
-          return res.status(404).json({ message: "Crawl or saved site not found" });
-        }
-        
+      if (savedSite) {
         // Verify the saved site belongs to the authenticated user
         if (savedSite.userId !== userId) {
           return res.status(403).json({ message: "You don't have permission to download this saved site" });
@@ -1145,7 +1140,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!crawl) {
           return res.status(404).json({ message: "Crawl not found for saved site" });
         }
+        
+        console.log(`Using crawlId ${crawlId} from savedSite ${id}`);
       } else {
+        // Try to get the crawl directly
+        crawlId = id;
+        crawl = await storage.getCrawl(id);
+        
+        if (!crawl) {
+          return res.status(404).json({ message: "Crawl or saved site not found" });
+        }
+        
         // Verify the crawl belongs to the authenticated user
         if (crawl.userId !== userId) {
           return res.status(403).json({ message: "You don't have permission to download this crawl" });
