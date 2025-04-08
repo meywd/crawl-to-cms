@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage_new";
 import { WebCrawler } from "./crawler";
+import { ReactConverter } from "./react-converter";
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
@@ -1332,6 +1333,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ 
         message: "Internal server error", 
         error: error?.message || "Unknown error" 
+      });
+    }
+  });
+  
+  // React Conversion Route
+  app.get("/api/sites/convert/:id", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID" });
+      }
+
+      // Get the saved site or crawl
+      const savedSite = await storage.getSavedSite(id);
+      
+      let crawlId: number;
+      if (savedSite) {
+        // Verify the site belongs to the authenticated user
+        if (savedSite.userId !== userId) {
+          return res.status(403).json({ message: "You don't have permission to convert this site" });
+        }
+        crawlId = savedSite.crawlId;
+      } else {
+        // Check if it's a direct crawl ID
+        const crawl = await storage.getCrawl(id);
+        if (!crawl) {
+          return res.status(404).json({ message: "Site or crawl not found" });
+        }
+        // Verify the crawl belongs to the authenticated user
+        if (crawl.userId !== userId) {
+          return res.status(403).json({ message: "You don't have permission to convert this crawl" });
+        }
+        crawlId = id;
+      }
+      
+      // Get the crawl data to verify it's complete
+      const crawl = await storage.getCrawl(crawlId);
+      if (!crawl) {
+        return res.status(404).json({ message: "Crawl data not found" });
+      }
+      
+      // Ensure the crawl is complete
+      if (crawl.status !== "completed") {
+        return res.status(400).json({ 
+          message: `Cannot convert crawl with status: ${crawl.status}. Crawl must be completed.` 
+        });
+      }
+      
+      console.log(`Converting crawl ID ${crawlId} to React application...`);
+      
+      // Use the React converter to generate the React application
+      const converter = new ReactConverter(storage);
+      const zip = await converter.convertToReact(crawlId);
+      
+      // Generate the ZIP file
+      const zipBlob = await zip.generateAsync({ type: "nodebuffer" });
+      
+      // Use the converter to create a filename
+      // Set response headers
+      res.setHeader('Content-Disposition', `attachment; filename="${crawl.url.replace(/^https?:\/\//, '').replace(/[^a-z0-9]/gi, '_')}_react.zip"`);
+      res.setHeader('Content-Type', 'application/zip');
+      
+      // Send the ZIP file
+      return res.send(zipBlob);
+    } catch (error) {
+      console.error("Error converting site to React:", error);
+      return res.status(500).json({ 
+        message: "Error generating React conversion", 
+        error: error instanceof Error ? error.message : "Unknown error" 
       });
     }
   });
