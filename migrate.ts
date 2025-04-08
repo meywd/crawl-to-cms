@@ -98,10 +98,14 @@ async function main() {
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id),
         crawl_id INTEGER NOT NULL REFERENCES crawls(id),
+        saved_site_id INTEGER REFERENCES saved_sites(id),
         url TEXT NOT NULL,
         name TEXT,
+        framework TEXT NOT NULL DEFAULT 'react',
+        page_count INTEGER NOT NULL,
+        component_count INTEGER NOT NULL DEFAULT 0,
         size INTEGER NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        converted_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
     `;
     console.log('Converted sites table created');
