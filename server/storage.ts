@@ -11,11 +11,14 @@ import {
   type InsertAsset,
   type SavedSite,
   type InsertSavedSite,
+  type ConvertedSite,
+  type InsertConvertedSite,
   users,
   crawls,
   pages,
   assets,
-  savedSites
+  savedSites,
+  convertedSites
 } from "@shared/schema";
 
 export interface IStorage {
@@ -53,6 +56,13 @@ export interface IStorage {
   getSavedSite(id: number): Promise<SavedSite | undefined>;
   getSavedSites(userId: number): Promise<SavedSite[]>;
   deleteSavedSite(id: number): Promise<boolean>;
+  
+  // ConvertedSite methods
+  createConvertedSite(site: InsertConvertedSite): Promise<ConvertedSite>;
+  getConvertedSite(id: number): Promise<ConvertedSite | undefined>;
+  getConvertedSites(userId: number): Promise<ConvertedSite[]>;
+  getConvertedSiteByCrawlId(crawlId: number): Promise<ConvertedSite | undefined>;
+  deleteConvertedSite(id: number): Promise<boolean>;
 }
 
 // Database storage implementation
@@ -383,6 +393,42 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(savedSites)
       .where(eq(savedSites.id, id));
+    return true; // Always return true as we've executed the delete operation
+  }
+  
+  // ConvertedSite methods
+  async createConvertedSite(site: InsertConvertedSite): Promise<ConvertedSite> {
+    const [result] = await db.insert(convertedSites).values(site).returning();
+    return result;
+  }
+
+  async getConvertedSite(id: number): Promise<ConvertedSite | undefined> {
+    const [result] = await db.select().from(convertedSites).where(eq(convertedSites.id, id));
+    return result;
+  }
+
+  async getConvertedSites(userId: number): Promise<ConvertedSite[]> {
+    const results = await db
+      .select()
+      .from(convertedSites)
+      .where(eq(convertedSites.userId, userId))
+      .orderBy(desc(convertedSites.convertedAt));
+    
+    return results;
+  }
+  
+  async getConvertedSiteByCrawlId(crawlId: number): Promise<ConvertedSite | undefined> {
+    const [result] = await db
+      .select()
+      .from(convertedSites)
+      .where(eq(convertedSites.crawlId, crawlId));
+    return result;
+  }
+
+  async deleteConvertedSite(id: number): Promise<boolean> {
+    const result = await db
+      .delete(convertedSites)
+      .where(eq(convertedSites.id, id));
     return true; // Always return true as we've executed the delete operation
   }
 }

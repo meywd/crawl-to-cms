@@ -83,6 +83,19 @@ export interface SavedSite {
   savedAt: string;
 }
 
+// Converted site
+export interface ConvertedSite {
+  id: string;
+  userId: string;
+  crawlId: string;
+  url: string;
+  name?: string;
+  pageCount: number;
+  size: number;
+  convertedAt: string;
+  reactVersion: string;
+}
+
 // API error response
 export interface ApiError {
   message: string;

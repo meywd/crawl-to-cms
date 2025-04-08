@@ -65,6 +65,21 @@ export const savedSites = pgTable("saved_sites", {
   savedAt: timestamp("saved_at").notNull().defaultNow(),
 });
 
+// ConvertedSites table for storing React-converted sites
+export const convertedSites = pgTable("converted_sites", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  crawlId: integer("crawl_id").notNull().references(() => crawls.id),
+  savedSiteId: integer("saved_site_id").references(() => savedSites.id),
+  url: text("url").notNull(),
+  name: text("name"),
+  framework: text("framework").notNull().default("react"),
+  pageCount: integer("page_count").notNull(),
+  componentCount: integer("component_count").notNull().default(0),
+  size: integer("size").notNull(),
+  convertedAt: timestamp("converted_at").notNull().defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -96,6 +111,11 @@ export const insertSavedSiteSchema = createInsertSchema(savedSites).omit({
   savedAt: true 
 });
 
+export const insertConvertedSiteSchema = createInsertSchema(convertedSites).omit({
+  id: true,
+  convertedAt: true
+});
+
 // Authentication schemas
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -123,6 +143,8 @@ export type Asset = typeof assets.$inferSelect;
 export type InsertAsset = z.infer<typeof insertAssetSchema>;
 export type SavedSite = typeof savedSites.$inferSelect;
 export type InsertSavedSite = z.infer<typeof insertSavedSiteSchema>;
+export type ConvertedSite = typeof convertedSites.$inferSelect;
+export type InsertConvertedSite = z.infer<typeof insertConvertedSiteSchema>;
 
 // Options schema
 export const crawlOptionsSchema = z.object({

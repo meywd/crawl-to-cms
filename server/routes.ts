@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage_new";
+import { storage } from "./storage";
 import { WebCrawler } from "./crawler";
 import { ReactConverter } from "./react-converter";
 import { z } from "zod";
@@ -14,6 +14,7 @@ import {
   insertPageSchema,
   insertAssetSchema,
   insertSavedSiteSchema,
+  insertConvertedSiteSchema,
   loginSchema, 
   registerSchema 
 } from "@shared/schema";
@@ -1337,6 +1338,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get Converted Sites Route
+  app.get("/api/sites/converted", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Get all converted sites for this user
+      const convertedSites = await storage.getConvertedSites(userId);
+      return res.status(200).json(convertedSites);
+    } catch (error) {
+      console.error("Error fetching converted sites:", error);
+      return res.status(500).json({ 
+        message: "Error fetching converted sites", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+  
+  // Delete Converted Site Route
+  app.delete("/api/sites/converted/:id", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID" });
+      }
+      
+      // Check if the converted site exists and belongs to the user
+      const convertedSite = await storage.getConvertedSite(id);
+      if (!convertedSite) {
+        return res.status(404).json({ message: "Converted site not found" });
+      }
+      
+      if (convertedSite.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to delete this converted site" });
+      }
+      
+      // Delete the converted site
+      await storage.deleteConvertedSite(id);
+      
+      return res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting converted site:", error);
+      return res.status(500).json({ 
+        message: "Error deleting converted site", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
   // React Conversion Route
   app.get("/api/sites/convert/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
@@ -1393,8 +1452,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const converter = new ReactConverter(storage);
       const zip = await converter.convertToReact(crawlId);
       
+      // Get pages to calculate component count
+      const pages = await storage.getPagesByCrawlId(crawlId);
+      
       // Generate the ZIP file
       const zipBlob = await zip.generateAsync({ type: "nodebuffer" });
+      const zipSize = zipBlob.length;
+      
+      // Create a name for the converted site
+      const siteName = savedSite ? savedSite.name : crawl.url.replace(/^https?:\/\//, '');
+      
+      // Check if a conversion already exists for this crawl
+      const existingConversion = await storage.getConvertedSiteByCrawlId(crawlId);
+      
+      if (!existingConversion) {
+        // Save the conversion information to the database
+        await storage.createConvertedSite({
+          userId,
+          crawlId,
+          savedSiteId: savedSite ? savedSite.id : null,
+          url: crawl.url,
+          name: siteName,
+          framework: "react",
+          pageCount: pages.length,
+          componentCount: pages.length + 4, // Pages plus Header, Footer, Layout, Navigation
+          size: zipSize
+        });
+      }
       
       // Use the converter to create a filename
       // Set response headers

@@ -4,6 +4,7 @@ import {
   type CrawlOptions, 
   type Page, 
   type SavedSite,
+  type ConvertedSite,
   type LoginRequest,
   type RegisterRequest,
   type AuthResponse,
@@ -108,4 +109,19 @@ export async function getSiteStructure(crawlId: string): Promise<any> {
 export async function convertToReact(id: string): Promise<void> {
   // The API handles the download directly through the browser
   window.open(`/api/sites/convert/${id}`, '_blank');
+}
+
+// Converted sites API functions
+export async function getConvertedSites(): Promise<ConvertedSite[]> {
+  const response = await apiRequest("GET", "/api/sites/converted", undefined);
+  return response.json();
+}
+
+export async function deleteConvertedSite(id: string): Promise<void> {
+  await apiRequest("DELETE", `/api/sites/converted/${id}`, undefined);
+}
+
+export async function downloadConvertedSite(id: string): Promise<void> {
+  // Open the download URL in a new tab
+  window.open(`/api/sites/download/${id}`, '_blank');
 }

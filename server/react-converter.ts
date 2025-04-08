@@ -1,4 +1,4 @@
-import { IStorage } from './storage_new';
+import { IStorage } from './storage';
 import { Asset, Crawl, Page } from '@shared/schema';
 import * as cheerio from 'cheerio';
 import * as fs from 'fs';

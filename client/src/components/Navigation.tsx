@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Globe, History, Database, LogIn, LogOut, UserCircle } from "lucide-react";
+import { Globe, History, Database, LogIn, LogOut, UserCircle, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -21,6 +21,7 @@ export default function Navigation() {
     if (location === "/") return "crawler";
     if (location === "/history") return "history";
     if (location === "/saved-sites") return "saved";
+    if (location === "/converted-sites") return "converted";
     return "crawler"; // Default to crawler
   };
 
@@ -36,12 +37,13 @@ export default function Navigation() {
           if (value === "crawler") setLocation("/");
           if (value === "history") setLocation("/history");
           if (value === "saved") setLocation("/saved-sites");
+          if (value === "converted") setLocation("/converted-sites");
         }} className="w-full sm:w-auto">
           <div className="border-b border-gray-200 w-full">
             <TabsList className="flex w-full">
               <TabsTrigger 
                 value="crawler"
-                className="text-xs sm:text-sm flex items-center py-3 sm:py-4 px-3 sm:px-6 focus:outline-none flex-1 justify-center"
+                className="text-xs sm:text-sm flex items-center py-3 sm:py-4 px-2 sm:px-4 focus:outline-none flex-1 justify-center"
               >
                 <Globe className="h-4 w-4 mr-1 sm:mr-2" />
                 <span className="hidden xs:inline">Crawler</span>
@@ -49,18 +51,26 @@ export default function Navigation() {
               </TabsTrigger>
               <TabsTrigger 
                 value="history"
-                className="text-xs sm:text-sm flex items-center py-3 sm:py-4 px-3 sm:px-6 focus:outline-none flex-1 justify-center"
+                className="text-xs sm:text-sm flex items-center py-3 sm:py-4 px-2 sm:px-4 focus:outline-none flex-1 justify-center"
               >
                 <History className="h-4 w-4 mr-1 sm:mr-2" />
                 <span>History</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="saved"
-                className="text-xs sm:text-sm flex items-center py-3 sm:py-4 px-3 sm:px-6 focus:outline-none flex-1 justify-center"
+                className="text-xs sm:text-sm flex items-center py-3 sm:py-4 px-2 sm:px-4 focus:outline-none flex-1 justify-center"
               >
                 <Database className="h-4 w-4 mr-1 sm:mr-2" />
                 <span className="hidden xs:inline">Saved Sites</span>
                 <span className="xs:hidden">Saved</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="converted"
+                className="text-xs sm:text-sm flex items-center py-3 sm:py-4 px-2 sm:px-4 focus:outline-none flex-1 justify-center"
+              >
+                <Code className="h-4 w-4 mr-1 sm:mr-2" />
+                <span className="hidden xs:inline">React Sites</span>
+                <span className="xs:hidden">React</span>
               </TabsTrigger>
             </TabsList>
           </div>
