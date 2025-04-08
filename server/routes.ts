@@ -1233,51 +1233,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const assetPath = asset.path.replace(/^\//, ''); // Remove leading slash
         const fileName = assetPath.split('/').pop() || 'file';
         
-        // Check if the content is base64 encoded (images) or text
-        let content = asset.content;
-        
-        // Base64 decode image content
-        if (asset.type === 'image' && content) {
-          try {
-            // For images, the content is stored as base64 string
-            content = Buffer.from(content, 'base64');
-          } catch (error) {
-            console.error(`Error decoding image content for ${assetPath}:`, error);
-            // Use content as is if there's an error
-          }
+        // Skip assets without content
+        if (!asset.content) {
+          console.log(`Skipping asset without content: ${assetPath}`);
+          continue;
         }
         
-        // Add file to the appropriate folder
-        switch (asset.type) {
-          case 'css':
-            cssFolder.file(fileName, content);
-            break;
-          case 'js':
-            jsFolder.file(fileName, content);
-            break;
-          case 'image':
-            imagesFolder.file(fileName, content);
-            break;
-          default:
-            otherFolder.file(fileName, content);
+        // Handle different asset types properly
+        try {
+          switch (asset.type) {
+            case 'css':
+              cssFolder.file(fileName, asset.content);
+              break;
+            case 'js':
+              jsFolder.file(fileName, asset.content);
+              break;
+            case 'image':
+              // For images, content is stored as base64 string
+              // JSZip accepts Buffer, base64 string, or Uint8Array directly
+              imagesFolder.file(fileName, asset.content, { base64: true });
+              break;
+            default:
+              otherFolder.file(fileName, asset.content);
+          }
+        } catch (error) {
+          console.error(`Error adding file ${assetPath} to ZIP:`, error);
+          // Continue to the next asset if there's an error
         }
       }
       
-      // Generate the zip file
-      const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
-      
-      // Prepare file name for download
-      const filename = assetType 
-        ? `${siteUrl.replace(/[^a-z0-9]/gi, '_')}_${assetType}.zip` 
-        : `${siteUrl.replace(/[^a-z0-9]/gi, '_')}.zip`;
-      
-      // Send the zip file as response
-      res.setHeader('Content-Type', 'application/zip');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      return res.status(200).send(zipContent);
-    } catch (error) {
+      try {
+        // Generate the zip file
+        const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
+        
+        // Prepare file name for download
+        const filename = assetType 
+          ? `${siteUrl.replace(/[^a-z0-9]/gi, '_')}_${assetType}.zip` 
+          : `${siteUrl.replace(/[^a-z0-9]/gi, '_')}.zip`;
+        
+        // Send the zip file as response
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.status(200).send(zipContent);
+      } catch (zipError) {
+        console.error("Error generating ZIP file:", zipError);
+        
+        // If ZIP generation fails, fall back to HTML download
+        let html = `<!DOCTYPE html>
+        <html>
+        <head>
+          <title>Downloaded ${typeTitle}: ${siteUrl}</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; }
+            h1 { color: #2563eb; }
+            ul { list-style-type: none; padding: 0; }
+            li { margin: 8px 0; padding: 8px; border-bottom: 1px solid #eee; }
+            .asset-type { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin-right: 8px; }
+            .css { background: #e6f2ff; color: #0066cc; }
+            .js { background: #fff9e6; color: #cc9900; }
+            .image { background: #e6ffec; color: #00994d; }
+            .other { background: #f2f2f2; color: #666666; }
+          </style>
+        </head>
+        <body>
+          <h1>Downloaded ${typeTitle}: ${siteUrl}</h1>
+          <p>ZIP generation failed, showing file listing instead.</p>
+          ${!assetType ? `<h2>Pages (${pages.length})</h2>
+          <ul>
+            ${pages.map(page => `<li>${page.path}</li>`).join('')}
+          </ul>` : ''}
+          <h2>Assets (${assets.length})</h2>
+          <ul>
+            ${assets.map(asset => `
+              <li>
+                <span class="asset-type ${asset.type}">${asset.type}</span>
+                ${asset.path}
+              </li>`).join('')}
+          </ul>
+        </body>
+        </html>`;
+  
+        const filename = assetType 
+          ? `${siteUrl.replace(/[^a-z0-9]/gi, '_')}_${assetType}.html` 
+          : `${siteUrl.replace(/[^a-z0-9]/gi, '_')}.html`;
+        
+        res.setHeader('Content-Type', 'text/html');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.status(200).send(html);
+      }
+    } catch (error: any) {
       console.error("Error downloading site:", error);
-      return res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ 
+        message: "Internal server error", 
+        error: error?.message || "Unknown error" 
+      });
     }
   });
 
