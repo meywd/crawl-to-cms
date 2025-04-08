@@ -92,6 +92,20 @@ async function main() {
     `;
     console.log('Saved sites table created');
 
+    // Create converted_sites table
+    await sql`
+      CREATE TABLE IF NOT EXISTS converted_sites (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        crawl_id INTEGER NOT NULL REFERENCES crawls(id),
+        url TEXT NOT NULL,
+        name TEXT,
+        size INTEGER NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `;
+    console.log('Converted sites table created');
+
     // Create session table for connect-pg-simple
     await sql`
       CREATE TABLE IF NOT EXISTS "session" (
