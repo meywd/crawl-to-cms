@@ -44,6 +44,9 @@ export default function Preview() {
   const queryParams = new URLSearchParams(window.location.search);
   const pathParam = queryParams.get('path');
   
+  // State for saving site loading
+  const [isSaving, setIsSaving] = useState(false);
+  
   // Set the selected page if path is provided in URL
   useEffect(() => {
     if (pathParam) {
@@ -168,8 +171,10 @@ export default function Preview() {
           <Button 
             className="bg-primary hover:bg-blue-700 text-white text-xs sm:text-sm h-8 px-2 sm:px-3"
             size="sm"
+            disabled={isSaving}
             onClick={async () => {
               try {
+                setIsSaving(true);
                 // Use the API saveSite function
                 await saveSite(crawlId);
                 
@@ -187,11 +192,21 @@ export default function Preview() {
                   description: "Failed to save site",
                   variant: "destructive",
                 });
+                setIsSaving(false);
               }
             }}
           >
-            <Database className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-            Save Site
+            {isSaving ? (
+              <>
+                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Database className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                Save Site
+              </>
+            )}
           </Button>
           <h1 className="text-lg sm:text-xl font-semibold">Site Preview</h1>
         </div>
