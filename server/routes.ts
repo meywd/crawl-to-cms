@@ -6,6 +6,7 @@ import { z } from "zod";
 import fs from "fs";
 import path from "path";
 import passport from "passport";
+import JSZip from "jszip";
 import { 
   crawlOptionsSchema, 
   insertCrawlSchema, 
@@ -1171,8 +1172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get site URL from crawl or from a page
       const siteUrl = crawl ? crawl.url : (pages.length > 0 ? new URL(pages[0].url).hostname : 'site');
       
-      // Create zip file with JSZip
-      const JSZip = require('jszip');
+      // Create zip file
       const zip = new JSZip();
       
       // Add an info.html file with basic information
