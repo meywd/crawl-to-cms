@@ -1,10 +1,26 @@
-import { pgTable, text, serial, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, jsonb, timestamp, varchar, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Users table for storing user information
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  username: varchar("username", { length: 50 }).notNull(),
+  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastLogin: timestamp("last_login"),
+}, (table) => {
+  return {
+    emailIdx: uniqueIndex("email_idx").on(table.email),
+    usernameIdx: uniqueIndex("username_idx").on(table.username),
+  };
+});
 
 // Crawls table for storing crawl information
 export const crawls = pgTable("crawls", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
   url: text("url").notNull(),
   depth: integer("depth").notNull(),
   status: text("status").notNull().default("idle"),
@@ -40,6 +56,7 @@ export const assets = pgTable("assets", {
 // SavedSites table for storing saved crawl results
 export const savedSites = pgTable("saved_sites", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
   crawlId: integer("crawl_id").notNull().references(() => crawls.id),
   url: text("url").notNull(),
   name: text("name"),
@@ -49,6 +66,12 @@ export const savedSites = pgTable("saved_sites", {
 });
 
 // Insert schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  lastLogin: true
+});
+
 export const insertCrawlSchema = createInsertSchema(crawls).omit({ 
   id: true, 
   startedAt: true, 
@@ -73,7 +96,25 @@ export const insertSavedSiteSchema = createInsertSchema(savedSites).omit({
   savedAt: true 
 });
 
+// Authentication schemas
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6)
+});
+
+export const registerSchema = z.object({
+  username: z.string().min(3).max(50),
+  email: z.string().email(),
+  password: z.string().min(6),
+  confirmPassword: z.string().min(6)
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"]
+});
+
 // Types
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Crawl = typeof crawls.$inferSelect;
 export type InsertCrawl = z.infer<typeof insertCrawlSchema>;
 export type Page = typeof pages.$inferSelect;

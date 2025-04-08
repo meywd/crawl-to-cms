@@ -3,8 +3,37 @@ import {
   type Crawl, 
   type CrawlOptions, 
   type Page, 
-  type SavedSite 
+  type SavedSite,
+  type LoginRequest,
+  type RegisterRequest,
+  type AuthResponse,
+  type User
 } from "@/types";
+
+// Authentication API functions
+export async function login(credentials: LoginRequest): Promise<AuthResponse> {
+  const response = await apiRequest("POST", "/api/auth/login", credentials);
+  return response.json();
+}
+
+export async function register(userData: RegisterRequest): Promise<AuthResponse> {
+  const response = await apiRequest("POST", "/api/auth/register", userData);
+  return response.json();
+}
+
+export async function logout(): Promise<void> {
+  await apiRequest("POST", "/api/auth/logout", undefined);
+}
+
+export async function getCurrentUser(): Promise<User | null> {
+  try {
+    const response = await apiRequest("GET", "/api/auth/me", undefined);
+    if (!response) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
 
 // Crawl API functions
 export async function startCrawl(url: string, depth: number, options: CrawlOptions): Promise<Crawl> {

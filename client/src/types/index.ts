@@ -1,5 +1,32 @@
 // Type definitions for the application
 
+// User types
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  createdAt: string;
+  lastLogin?: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  username: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface AuthResponse {
+  success: boolean;
+  user?: User;
+  message?: string;
+}
+
 // Crawl status types
 export type CrawlStatus = "idle" | "in_progress" | "paused" | "completed" | "error" | "cancelled";
 
@@ -25,6 +52,7 @@ export interface Page {
 // Crawl types
 export interface Crawl {
   id: string;
+  userId: string;
   url: string;
   depth: number;
   options: CrawlOptions;
@@ -46,9 +74,10 @@ export interface CrawlOptions {
 // Saved site
 export interface SavedSite {
   id: string;
-  crawlId: string; // Added crawlId to match server schema
+  userId: string;
+  crawlId: string;
   url: string;
-  name?: string;  // Added name which is in the schema
+  name?: string;
   pageCount: number;
   size: number;
   savedAt: string;

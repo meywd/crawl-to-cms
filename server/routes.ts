@@ -5,13 +5,17 @@ import { WebCrawler } from "./crawler";
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
+import passport from "passport";
 import { 
   crawlOptionsSchema, 
   insertCrawlSchema, 
   insertPageSchema,
   insertAssetSchema,
-  insertSavedSiteSchema
+  insertSavedSiteSchema,
+  loginSchema, 
+  registerSchema 
 } from "@shared/schema";
+import { registerUser, isAuthenticated, getUserId } from "./auth";
 
 // Helper function to ensure URLs have a protocol
 function ensureHttpProtocol(url: string): string {
@@ -33,9 +37,15 @@ function isValidUrl(urlString: string): boolean {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Crawl routes
-  app.post("/api/crawl", async (req: Request, res: Response) => {
+  app.post("/api/crawl", isAuthenticated, async (req: Request, res: Response) => {
     try {
       console.log("Starting crawl with data:", req.body);
+      
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
       
       // Validate the request data
       const schema = insertCrawlSchema.extend({
@@ -58,7 +68,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if there's already an active crawl for this URL
       const normalizedUrl = url.replace(/^https?:\/\//, '');
-      const existingCrawl = await storage.getCrawlByUrl(normalizedUrl);
+      const existingCrawl = await storage.getCrawlByUrl(normalizedUrl, userId);
       
       if (existingCrawl && existingCrawl.status === "in_progress") {
         return res.status(409).json({ 
@@ -66,8 +76,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create a new crawl with the normalized URL
+      // Create a new crawl with the normalized URL and user ID
       const crawl = await storage.createCrawl({
+        userId,
         url: normalizedUrl,
         depth,
         options
@@ -169,10 +180,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // This route needs to be before the /api/crawl/:id route to avoid conflict
-  app.get("/api/crawl/history", async (req: Request, res: Response) => {
+  app.get("/api/crawl/history", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      console.log("Fetching crawl history");
-      const crawls = await storage.getCrawlHistory();
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      console.log("Fetching crawl history for user:", userId);
+      const crawls = await storage.getCrawlHistory(userId);
       console.log("Crawl history results:", crawls);
       return res.status(200).json(crawls);
     } catch (error) {
@@ -397,8 +414,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Saved sites routes
-  app.post("/api/sites/save", async (req: Request, res: Response) => {
+  app.post("/api/sites/save", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       // Parse the crawlId as a number since it might come as a string from the client
       let { crawlId, name } = req.body;
       crawlId = parseInt(crawlId, 10);
@@ -411,6 +434,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!crawl) {
         return res.status(404).json({ message: "Crawl not found" });
       }
+      
+      // Verify the crawl belongs to the authenticated user
+      if (crawl.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to save this crawl" });
+      }
 
       const pages = await storage.getPagesByCrawlId(crawlId);
       const assets = await storage.getAssetsByCrawlId(crawlId);
@@ -422,6 +450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalSizeMB = Math.round(totalSizeBytes / (1024 * 1024));
 
       const savedSite = await storage.createSavedSite({
+        userId,
         crawlId,
         url: crawl.url,
         name: name || crawl.url,
@@ -439,9 +468,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/sites/saved", async (req: Request, res: Response) => {
+  app.get("/api/sites/saved", isAuthenticated, async (req: Request, res: Response) => {
     try {
-      const savedSites = await storage.getSavedSites();
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const savedSites = await storage.getSavedSites(userId);
       return res.status(200).json(savedSites);
     } catch (error) {
       console.error("Error fetching saved sites:", error);
@@ -449,11 +484,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/sites/saved/:id", async (req: Request, res: Response) => {
+  app.delete("/api/sites/saved/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid saved site ID" });
+      }
+
+      // Get the saved site to check ownership
+      const savedSite = await storage.getSavedSite(id);
+      if (!savedSite) {
+        return res.status(404).json({ message: "Saved site not found" });
+      }
+
+      // Verify ownership
+      if (savedSite.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to delete this saved site" });
       }
 
       const success = await storage.deleteSavedSite(id);
@@ -469,13 +521,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Preview routes
-  app.get("/api/preview/:crawlId/:path(*)", async (req: Request, res: Response) => {
+  app.get("/api/preview/:crawlId/:path(*)", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+    
       const crawlId = parseInt(req.params.crawlId);
       let pagePath = req.params.path || "index.html";
       
       if (isNaN(crawlId)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
+      }
+      
+      // Get the crawl to verify ownership
+      const crawl = await storage.getCrawl(crawlId);
+      if (!crawl) {
+        return res.status(404).json({ message: "Crawl not found" });
+      }
+      
+      // Verify the crawl belongs to the authenticated user
+      if (crawl.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to preview this crawl" });
       }
       
       // Fix duplicated API paths recursively - handle multiple levels of duplication
@@ -907,8 +976,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Download routes
-  app.get("/api/sites/download/:id", async (req: Request, res: Response) => {
+  app.get("/api/sites/download/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+    
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
@@ -918,17 +993,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assetType = req.query.type as string | undefined;
       
       // Get crawl directly (not saved site) - this allows downloading assets for any crawl
-      const crawl = await storage.getCrawl(id);
+      let crawl = await storage.getCrawl(id);
+      let crawlId = id;
+      
       if (!crawl) {
         // Try to find it as a saved site as fallback
         const savedSite = await storage.getSavedSite(id);
         if (!savedSite) {
           return res.status(404).json({ message: "Crawl or saved site not found" });
         }
+        
+        // Verify the saved site belongs to the authenticated user
+        if (savedSite.userId !== userId) {
+          return res.status(403).json({ message: "You don't have permission to download this saved site" });
+        }
+        
         // Use the crawl ID from the saved site
-        const crawlForSavedSite = await storage.getCrawl(savedSite.crawlId);
-        if (!crawlForSavedSite) {
+        crawlId = savedSite.crawlId;
+        crawl = await storage.getCrawl(crawlId);
+        if (!crawl) {
           return res.status(404).json({ message: "Crawl not found for saved site" });
+        }
+      } else {
+        // Verify the crawl belongs to the authenticated user
+        if (crawl.userId !== userId) {
+          return res.status(403).json({ message: "You don't have permission to download this crawl" });
         }
       }
 
@@ -997,6 +1086,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error downloading site:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
+  });
+
+  // Authentication routes
+  app.post('/api/auth/register', async (req: Request, res: Response) => {
+    try {
+      const userData = registerSchema.parse(req.body);
+
+      const result = await registerUser(userData);
+      
+      // Log in the user automatically after registration
+      req.login(result.user, (err) => {
+        if (err) {
+          console.error('Login error after registration:', err);
+          return res.status(500).json({ message: 'Error logging in after registration' });
+        }
+        return res.status(201).json(result);
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.message });
+      }
+      console.error('Registration error:', error);
+      return res.status(400).json({ 
+        message: error instanceof Error ? error.message : 'Registration failed' 
+      });
+    }
+  });
+
+  app.post('/api/auth/login', (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Validate request data
+      loginSchema.parse(req.body);
+      
+      passport.authenticate('local', (err: Error, user: any, info: { message: string }) => {
+        if (err) {
+          console.error('Login error:', err);
+          return next(err);
+        }
+        
+        if (!user) {
+          return res.status(401).json({ message: info.message || 'Invalid credentials' });
+        }
+        
+        req.login(user, (loginErr) => {
+          if (loginErr) {
+            console.error('Login error after authentication:', loginErr);
+            return next(loginErr);
+          }
+          
+          return res.status(200).json({ 
+            user: {
+              id: user.id,
+              username: user.username,
+              email: user.email
+            } 
+          });
+        });
+      })(req, res, next);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.message });
+      }
+      return res.status(400).json({ 
+        message: error instanceof Error ? error.message : 'Login validation failed' 
+      });
+    }
+  });
+
+  app.post('/api/auth/logout', (req: Request, res: Response) => {
+    req.logout((err) => {
+      if (err) {
+        console.error('Logout error:', err);
+        return res.status(500).json({ message: 'Error during logout' });
+      }
+      req.session.destroy((err) => {
+        if (err) {
+          console.error('Session destruction error:', err);
+          return res.status(500).json({ message: 'Error destroying session' });
+        }
+        res.clearCookie('connect.sid');
+        return res.status(200).json({ message: 'Logged out successfully' });
+      });
+    });
+  });
+
+  app.get('/api/auth/user', (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(200).json({ user: null });
+    }
+    
+    const user = req.user as any;
+    return res.status(200).json({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email
+      }
+    });
   });
 
   const httpServer = createServer(app);

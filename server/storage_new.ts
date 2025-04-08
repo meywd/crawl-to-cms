@@ -1,6 +1,8 @@
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
 import {
+  type User,
+  type InsertUser,
   type Crawl,
   type InsertCrawl,
   type Page,
@@ -9,6 +11,7 @@ import {
   type InsertAsset,
   type SavedSite,
   type InsertSavedSite,
+  users,
   crawls,
   pages,
   assets,
@@ -16,15 +19,22 @@ import {
 } from "@shared/schema";
 
 export interface IStorage {
+  // User methods
+  createUser(user: InsertUser): Promise<User>;
+  getUser(id: number): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  updateUserLastLogin(id: number): Promise<User | undefined>;
+  
   // Crawl methods
   createCrawl(crawl: InsertCrawl): Promise<Crawl>;
   getCrawl(id: number): Promise<Crawl | undefined>;
-  getCrawlByUrl(url: string): Promise<Crawl | undefined>;
+  getCrawlByUrl(url: string, userId: number): Promise<Crawl | undefined>;
   updateCrawlStatus(id: number, status: string): Promise<Crawl | undefined>;
   updateCrawlProgress(id: number, pageCount: number): Promise<Crawl | undefined>;
   completeCrawl(id: number, pageCount: number): Promise<Crawl | undefined>;
   failCrawl(id: number, error: string): Promise<Crawl | undefined>;
-  getCrawlHistory(): Promise<Crawl[]>;
+  getCrawlHistory(userId: number): Promise<Crawl[]>;
   
   // Page methods
   createPage(page: InsertPage): Promise<Page>;
@@ -41,12 +51,42 @@ export interface IStorage {
   // SavedSite methods
   createSavedSite(site: InsertSavedSite): Promise<SavedSite>;
   getSavedSite(id: number): Promise<SavedSite | undefined>;
-  getSavedSites(): Promise<SavedSite[]>;
+  getSavedSites(userId: number): Promise<SavedSite[]>;
   deleteSavedSite(id: number): Promise<boolean>;
 }
 
 // Database storage implementation
 export class DatabaseStorage implements IStorage {
+  // User methods
+  async createUser(user: InsertUser): Promise<User> {
+    const [result] = await db.insert(users).values(user).returning();
+    return result;
+  }
+
+  async getUser(id: number): Promise<User | undefined> {
+    const [result] = await db.select().from(users).where(eq(users.id, id));
+    return result;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [result] = await db.select().from(users).where(eq(users.email, email));
+    return result;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [result] = await db.select().from(users).where(eq(users.username, username));
+    return result;
+  }
+
+  async updateUserLastLogin(id: number): Promise<User | undefined> {
+    const [result] = await db
+      .update(users)
+      .set({ lastLogin: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return result;
+  }
+  
   // Crawl methods
   async createCrawl(crawl: InsertCrawl): Promise<Crawl> {
     const [result] = await db.insert(crawls).values(crawl).returning();
@@ -58,14 +98,15 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getCrawlByUrl(url: string): Promise<Crawl | undefined> {
+  async getCrawlByUrl(url: string, userId: number): Promise<Crawl | undefined> {
     const [result] = await db
       .select()
       .from(crawls)
       .where(
         and(
           eq(crawls.url, url),
-          eq(crawls.status, "in_progress")
+          eq(crawls.status, "in_progress"),
+          eq(crawls.userId, userId)
         )
       );
     return result;
@@ -115,10 +156,11 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getCrawlHistory(): Promise<Crawl[]> {
+  async getCrawlHistory(userId: number): Promise<Crawl[]> {
     const results = await db
       .select()
       .from(crawls)
+      .where(eq(crawls.userId, userId))
       .orderBy(desc(crawls.startedAt));
     return results;
   }
@@ -198,10 +240,11 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getSavedSites(): Promise<SavedSite[]> {
+  async getSavedSites(userId: number): Promise<SavedSite[]> {
     const results = await db
       .select()
       .from(savedSites)
+      .where(eq(savedSites.userId, userId))
       .orderBy(desc(savedSites.savedAt));
     return results;
   }
