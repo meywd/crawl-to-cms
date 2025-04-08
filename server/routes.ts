@@ -48,11 +48,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Validate the request data
-      const schema = insertCrawlSchema.extend({
+      const clientSchema = z.object({
+        url: z.string(),
+        depth: z.number(),
         options: crawlOptionsSchema
       });
       
-      let { url, depth, options } = schema.parse(req.body);
+      // Parse the client request first
+      const { url: clientUrl, depth, options } = clientSchema.parse(req.body);
+      
+      // This is the URL that will be used in our validation
+      let url = clientUrl;
       
       // Ensure URL has protocol
       url = ensureHttpProtocol(url);

@@ -45,11 +45,9 @@ export default function CrawlerForm({ onStartCrawl, isProcessing }: CrawlerFormP
     // Clean and normalize the URL
     let cleanUrl = urlInput.trim();
     
-    // Remove 'http://' or 'https://' if the user included it
-    if (cleanUrl.startsWith('http://')) {
-      cleanUrl = cleanUrl.substring(7);
-    } else if (cleanUrl.startsWith('https://')) {
-      cleanUrl = cleanUrl.substring(8);
+    // Ensure URL has protocol
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+      cleanUrl = 'https://' + cleanUrl;
     }
     
     // Pass the cleaned URL to the parent component
@@ -79,7 +77,7 @@ export default function CrawlerForm({ onStartCrawl, isProcessing }: CrawlerFormP
             disabled={isProcessing}
           />
         </div>
-        <p className="mt-1 text-sm text-gray-500">Enter the full domain without 'http://' or 'https://'</p>
+        <p className="mt-1 text-sm text-gray-500">Enter the domain without 'https://' (it will be added automatically)</p>
       </div>
       
       {/* Crawl Settings Section */}
