@@ -92,88 +92,89 @@ export default function SavedSitesPage() {
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
       <div className="border-b border-gray-200">
-        <div className="flex py-4 px-6">
-          <Database className="h-5 w-5 mr-2 text-primary" />
-          <h1 className="text-lg font-medium">Saved Sites</h1>
+        <div className="flex py-3 sm:py-4 px-4 sm:px-6">
+          <Database className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-primary" />
+          <h1 className="text-base sm:text-lg font-medium">Saved Sites</h1>
         </div>
       </div>
 
-      <div className="p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-6">Your Saved Replicas</h2>
+      <div className="p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4 sm:mb-6">Your Saved Replicas</h2>
         
         {isLoading ? (
           <div className="flex justify-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-primary"></div>
           </div>
         ) : isError ? (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-8">
-              <h3 className="text-lg font-medium text-red-600">Error loading saved sites</h3>
-              <p className="text-sm text-gray-500 mb-4">There was a problem loading your saved sites</p>
+            <CardContent className="flex flex-col items-center justify-center py-6 sm:py-8">
+              <h3 className="text-base sm:text-lg font-medium text-red-600">Error loading saved sites</h3>
+              <p className="text-xs sm:text-sm text-gray-500 mb-4">There was a problem loading your saved sites</p>
               <Button 
                 onClick={() => setLocation("/")}
-                className="bg-primary hover:bg-blue-700"
+                className="bg-primary hover:bg-blue-700 text-xs sm:text-sm"
               >
                 Return home
               </Button>
             </CardContent>
           </Card>
         ) : savedSites && savedSites.length > 0 ? (
-          <div className="grid gap-4">
+          <div className="grid gap-3 sm:gap-4">
             {savedSites.map((site: SavedSite) => (
               <Card key={site.id} className="overflow-hidden">
-                <CardHeader className="bg-gray-50 py-3 px-4">
-                  <CardTitle className="text-base font-medium flex items-center">
-                    <Globe className="h-4 w-4 mr-2 text-primary" />
-                    {site.name || site.url}
+                <CardHeader className="bg-gray-50 py-2 sm:py-3 px-3 sm:px-4">
+                  <CardTitle className="text-sm sm:text-base font-medium flex items-center truncate">
+                    <Globe className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0 text-primary" />
+                    <span className="truncate">{site.name || site.url}</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center">
-                    <div className="text-sm text-gray-500">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4">
+                    <div className="text-xs sm:text-sm text-gray-500">
                       <p>Saved on {new Date(site.savedAt).toLocaleString()}</p>
                       <p>{site.pageCount} pages | {site.size} MB</p>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap justify-center sm:justify-end gap-1 sm:gap-2">
                       <Button 
                         variant="outline" 
                         size="sm"
+                        className="h-7 sm:h-8 px-2 text-xs sm:text-sm"
                         onClick={() => handleViewSite(site)}
                       >
-                        <ExternalLink className="h-4 w-4 mr-1" />
-                        View
+                        <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        <span className="hidden xs:inline">View</span>
                       </Button>
                       <Button 
                         variant="outline" 
                         size="sm"
-                        className="text-primary hover:text-blue-700"
+                        className="h-7 sm:h-8 px-2 text-xs sm:text-sm text-primary hover:text-blue-700"
                         onClick={() => handleDownloadSite(site.id.toString())}
                       >
-                        <Download className="h-4 w-4 mr-1" />
-                        Download
+                        <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        <span className="hidden xs:inline">Download</span>
                       </Button>
                       <Button 
                         variant="outline" 
                         size="sm"
-                        className="text-purple-500 hover:text-purple-700"
+                        className="h-7 sm:h-8 px-2 text-xs sm:text-sm text-purple-500 hover:text-purple-700"
                         onClick={() => handleConvertToReact(site)}
                       >
-                        <FileCode className="h-4 w-4 mr-1" />
-                        To React
+                        <FileCode className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        <span className="hidden xs:inline">To React</span>
                       </Button>
                       <Button 
                         variant="outline" 
                         size="sm"
-                        className="text-red-500 hover:text-red-600"
+                        className="h-7 sm:h-8 px-2 text-xs sm:text-sm text-red-500 hover:text-red-600"
                         onClick={() => handleDeleteSite(site.id.toString())}
                         disabled={deleteMutation.isPending}
                       >
                         {deleteMutation.isPending ? (
-                          <div className="h-4 w-4 mr-1 animate-spin rounded-full border-2 border-red-500 border-t-transparent"></div>
+                          <div className="h-3 w-3 sm:h-4 sm:w-4 mr-1 animate-spin rounded-full border-2 border-red-500 border-t-transparent"></div>
                         ) : (
-                          <Trash2 className="h-4 w-4 mr-1" />
+                          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                         )}
-                        Delete
+                        <span className="hidden xs:inline">Delete</span>
                       </Button>
                     </div>
                   </div>
@@ -183,13 +184,13 @@ export default function SavedSitesPage() {
           </div>
         ) : (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-8">
-              <Database className="h-12 w-12 text-gray-300 mb-2" />
-              <h3 className="text-lg font-medium text-gray-600">No saved sites</h3>
-              <p className="text-sm text-gray-500 mb-4">Your saved replicated sites will appear here</p>
+            <CardContent className="flex flex-col items-center justify-center py-6 sm:py-8">
+              <Database className="h-8 w-8 sm:h-12 sm:w-12 text-gray-300 mb-2" />
+              <h3 className="text-base sm:text-lg font-medium text-gray-600">No saved sites</h3>
+              <p className="text-xs sm:text-sm text-gray-500 mb-4">Your saved replicated sites will appear here</p>
               <Button 
                 onClick={() => setLocation("/")}
-                className="bg-primary hover:bg-blue-700"
+                className="bg-primary hover:bg-blue-700 text-xs sm:text-sm"
               >
                 Start a new crawl
               </Button>

@@ -55,16 +55,16 @@ export default function CrawlerForm({ onStartCrawl, isProcessing }: CrawlerFormP
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <h2 className="text-xl font-semibold text-gray-800 mb-6">Website Crawler & Replicator</h2>
+    <div className="max-w-3xl mx-auto px-2 sm:px-0">
+      <h2 className="text-lg xs:text-xl font-semibold text-gray-800 mb-4 sm:mb-6">Website Crawler & Replicator</h2>
       
       {/* URL Input Section */}
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <Label htmlFor="website-url" className="block text-sm font-medium text-gray-700 mb-1">
           Target Website URL
         </Label>
         <div className="mt-1 flex rounded-md shadow-sm">
-          <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+          <span className="inline-flex items-center px-2 sm:px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-xs sm:text-sm">
             https://
           </span>
           <Input
@@ -72,22 +72,22 @@ export default function CrawlerForm({ onStartCrawl, isProcessing }: CrawlerFormP
             id="website-url"
             value={urlInput}
             onChange={handleUrlChange}
-            className="flex-1 rounded-none rounded-r-md"
+            className="flex-1 rounded-none rounded-r-md text-sm"
             placeholder="example.com"
             disabled={isProcessing}
           />
         </div>
-        <p className="mt-1 text-sm text-gray-500">Enter the domain without 'https://' (it will be added automatically)</p>
+        <p className="mt-1 text-xs sm:text-sm text-gray-500">Enter the domain without 'https://' (it will be added automatically)</p>
       </div>
       
       {/* Crawl Settings Section */}
-      <Card className="mb-6 bg-gray-50">
-        <CardContent className="pt-4">
-          <div className="flex items-center mb-4">
-            <h3 className="text-lg font-medium text-gray-700">Crawl Settings</h3>
+      <Card className="mb-4 sm:mb-6 bg-gray-50">
+        <CardContent className="pt-4 px-3 sm:px-6">
+          <div className="flex items-center mb-3 sm:mb-4">
+            <h3 className="text-base sm:text-lg font-medium text-gray-700">Crawl Settings</h3>
           </div>
           
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {/* Crawl Depth Control */}
             <div>
               <Label htmlFor="crawl-depth" className="block text-sm font-medium text-gray-700 mb-1">
@@ -115,7 +115,7 @@ export default function CrawlerForm({ onStartCrawl, isProcessing }: CrawlerFormP
             </div>
             
             {/* Crawl Options */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 xs:gap-4 xs:grid-cols-2">
               <div className="flex items-start">
                 <Checkbox
                   id="downloadImages"
@@ -126,7 +126,7 @@ export default function CrawlerForm({ onStartCrawl, isProcessing }: CrawlerFormP
                   disabled={isProcessing}
                   className="mt-1"
                 />
-                <div className="ml-3 text-sm">
+                <div className="ml-3 text-xs sm:text-sm">
                   <Label htmlFor="downloadImages" className="font-medium text-gray-700">
                     Download Images
                   </Label>
@@ -144,7 +144,7 @@ export default function CrawlerForm({ onStartCrawl, isProcessing }: CrawlerFormP
                   disabled={isProcessing}
                   className="mt-1"
                 />
-                <div className="ml-3 text-sm">
+                <div className="ml-3 text-xs sm:text-sm">
                   <Label htmlFor="preserveCss" className="font-medium text-gray-700">
                     Extract CSS Styling
                   </Label>
@@ -162,7 +162,7 @@ export default function CrawlerForm({ onStartCrawl, isProcessing }: CrawlerFormP
                   disabled={isProcessing}
                   className="mt-1"
                 />
-                <div className="ml-3 text-sm">
+                <div className="ml-3 text-xs sm:text-sm">
                   <Label htmlFor="preserveNav" className="font-medium text-gray-700">
                     Preserve Navigation
                   </Label>
@@ -180,7 +180,7 @@ export default function CrawlerForm({ onStartCrawl, isProcessing }: CrawlerFormP
                   disabled={isProcessing}
                   className="mt-1"
                 />
-                <div className="ml-3 text-sm">
+                <div className="ml-3 text-xs sm:text-sm">
                   <Label htmlFor="respectRobots" className="font-medium text-gray-700">
                     Respect robots.txt
                   </Label>
@@ -190,13 +190,13 @@ export default function CrawlerForm({ onStartCrawl, isProcessing }: CrawlerFormP
             </div>
             
             {/* Advanced Settings Button */}
-            <div className="pt-2">
+            <div className="pt-1 sm:pt-2">
               <Button 
                 variant="link" 
-                className="text-sm text-primary p-0 h-auto" 
+                className="text-xs sm:text-sm text-primary p-0 h-auto" 
                 disabled={isProcessing}
               >
-                <Settings className="h-4 w-4 mr-1" />
+                <Settings className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                 Advanced Settings
               </Button>
             </div>
@@ -211,9 +211,9 @@ export default function CrawlerForm({ onStartCrawl, isProcessing }: CrawlerFormP
           size="lg"
           onClick={handleStartCrawl}
           disabled={isProcessing || !urlInput.trim()}
-          className="bg-primary hover:bg-blue-700"
+          className="bg-primary hover:bg-blue-700 w-full xs:w-auto text-sm sm:text-base"
         >
-          <Globe className="h-5 w-5 mr-2" />
+          <Globe className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
           Start Crawling
         </Button>
       </div>

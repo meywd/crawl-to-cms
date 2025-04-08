@@ -151,21 +151,23 @@ export default function Preview() {
   }
   
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setLocation("/")}>
-            <Home className="h-4 w-4 mr-2" />
-            Home
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-2 sm:gap-4">
+        <div className="flex flex-wrap gap-1 xs:gap-2 w-full md:w-auto justify-center md:justify-start">
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm h-8 px-2 sm:px-3" onClick={() => setLocation("/")}>
+            <Home className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+            <span>Home</span>
           </Button>
-          <Button variant="outline" onClick={() => setLocation("/history")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to History
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm h-8 px-2 sm:px-3" onClick={() => setLocation("/history")}>
+            <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+            <span className="hidden xs:inline">Back to History</span>
+            <span className="xs:hidden">History</span>
           </Button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-center md:justify-end">
           <Button 
-            className="bg-primary hover:bg-blue-700 text-white"
+            className="bg-primary hover:bg-blue-700 text-white text-xs sm:text-sm h-8 px-2 sm:px-3"
+            size="sm"
             onClick={async () => {
               try {
                 // Use the API saveSite function
@@ -188,30 +190,30 @@ export default function Preview() {
               }
             }}
           >
-            <Database className="h-4 w-4 mr-2" />
+            <Database className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
             Save Site
           </Button>
-          <h1 className="text-xl font-semibold">Site Preview</h1>
+          <h1 className="text-lg sm:text-xl font-semibold">Site Preview</h1>
         </div>
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="preview">Preview Site</TabsTrigger>
-          <TabsTrigger value="assets">Downloaded Assets ({assets.length})</TabsTrigger>
+        <TabsList className="mb-2 sm:mb-4 flex w-full">
+          <TabsTrigger value="preview" className="flex-1 text-xs sm:text-sm py-1 sm:py-2">Preview Site</TabsTrigger>
+          <TabsTrigger value="assets" className="flex-1 text-xs sm:text-sm py-1 sm:py-2">Assets ({assets.length})</TabsTrigger>
         </TabsList>
         
         <TabsContent value="preview">
-          <div className="grid grid-cols-12 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4">
             {/* Site structure sidebar */}
-            <div className="col-span-3 bg-white rounded-lg shadow overflow-hidden">
-              <div className="p-4 border-b">
-                <h2 className="font-medium">Site Structure</h2>
+            <div className="md:col-span-3 bg-white rounded-lg shadow overflow-hidden">
+              <div className="p-3 sm:p-4 border-b">
+                <h2 className="text-sm sm:text-base font-medium">Site Structure</h2>
               </div>
-              <div className="p-4">
+              <div className="p-3 sm:p-4 max-h-[200px] sm:max-h-[300px] md:max-h-none overflow-auto">
                 {isLoadingStructure ? (
                   <div className="flex justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                    <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin text-gray-400" />
                   </div>
                 ) : (
                   <SiteStructure 
@@ -224,11 +226,15 @@ export default function Preview() {
             </div>
             
             {/* Content preview */}
-            <div className="col-span-9 bg-white rounded-lg shadow">
-              <div className="p-4 border-b">
-                <h2 className="font-medium">Page Preview: {selectedPage}</h2>
+            <div className="md:col-span-9 bg-white rounded-lg shadow">
+              <div className="p-3 sm:p-4 border-b">
+                <h2 className="text-sm sm:text-base font-medium truncate">
+                  <span className="hidden xs:inline">Page Preview: </span>
+                  <span className="xs:hidden">Page: </span>
+                  {selectedPage}
+                </h2>
               </div>
-              <div className="border rounded-b-lg h-[600px] overflow-auto">
+              <div className="border rounded-b-lg h-[300px] sm:h-[400px] md:h-[600px] overflow-auto">
                 <ReplicatedSitePreview siteUrl={`/api/preview/${crawlId}/${selectedPage}`} />
               </div>
             </div>
@@ -236,20 +242,21 @@ export default function Preview() {
         </TabsContent>
         
         <TabsContent value="assets">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-medium">Downloaded Assets</h2>
+          <div className="bg-white rounded-lg shadow p-3 sm:p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+              <h2 className="text-lg sm:text-xl font-medium">Downloaded Assets</h2>
               
               {assets.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Assets
+                    <Button variant="outline" size="sm" className="text-xs sm:text-sm h-8 px-2 sm:px-3">
+                      <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Download Assets</span>
+                      <span className="sm:hidden">Download</span>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Download Options</DropdownMenuLabel>
+                    <DropdownMenuLabel className="text-xs sm:text-sm">Download Options</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => {
                       window.open(`/api/sites/download/${crawlId}`, '_blank');
@@ -257,8 +264,8 @@ export default function Preview() {
                         title: "Download started",
                         description: "Your assets are being prepared for download."
                       });
-                    }}>
-                      <Archive className="h-4 w-4 mr-2" />
+                    }} className="text-xs sm:text-sm">
+                      <Archive className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                       Download All as ZIP
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => {
@@ -267,8 +274,8 @@ export default function Preview() {
                         title: "React conversion started",
                         description: "Converting site to a React application. Download will begin shortly."
                       });
-                    }}>
-                      <FileCode className="h-4 w-4 text-purple-500 mr-2" />
+                    }} className="text-xs sm:text-sm">
+                      <FileCode className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500 mr-1 sm:mr-2" />
                       Convert to React App
                     </DropdownMenuItem>
                     {cssAssets.length > 0 && (
@@ -278,8 +285,8 @@ export default function Preview() {
                           title: "Download started",
                           description: "CSS files are being prepared for download."
                         });
-                      }}>
-                        <FileCode className="h-4 w-4 text-blue-500 mr-2" />
+                      }} className="text-xs sm:text-sm">
+                        <FileCode className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 mr-1 sm:mr-2" />
                         Download CSS Files
                       </DropdownMenuItem>
                     )}
@@ -290,8 +297,8 @@ export default function Preview() {
                           title: "Download started",
                           description: "JavaScript files are being prepared for download."
                         });
-                      }}>
-                        <FileCode className="h-4 w-4 text-yellow-500 mr-2" />
+                      }} className="text-xs sm:text-sm">
+                        <FileCode className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 mr-1 sm:mr-2" />
                         Download JavaScript Files
                       </DropdownMenuItem>
                     )}
@@ -302,8 +309,8 @@ export default function Preview() {
                           title: "Download started",
                           description: "Image files are being prepared for download."
                         });
-                      }}>
-                        <Image className="h-4 w-4 text-green-500 mr-2" />
+                      }} className="text-xs sm:text-sm">
+                        <Image className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 mr-1 sm:mr-2" />
                         Download Image Files
                       </DropdownMenuItem>
                     )}
@@ -322,25 +329,39 @@ export default function Preview() {
               </Alert>
             ) : (
               <Tabs defaultValue="all">
-                <TabsList>
-                  <TabsTrigger value="all">All ({assets.length})</TabsTrigger>
-                  <TabsTrigger value="css">CSS ({cssAssets.length})</TabsTrigger>
-                  <TabsTrigger value="js">JavaScript ({jsAssets.length})</TabsTrigger>
-                  <TabsTrigger value="images">Images ({imageAssets.length})</TabsTrigger>
-                  <TabsTrigger value="other">Other ({otherAssets.length})</TabsTrigger>
+                <TabsList className="flex w-full overflow-x-auto space-x-0 border rounded-md">
+                  <TabsTrigger value="all" className="flex-1 text-xs sm:text-sm py-1 px-2 sm:px-3">
+                    All ({assets.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="css" className="flex-1 text-xs sm:text-sm py-1 px-2 sm:px-3">
+                    <span className="hidden xs:inline">CSS</span>
+                    <span className="xs:hidden">CSS</span> ({cssAssets.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="js" className="flex-1 text-xs sm:text-sm py-1 px-2 sm:px-3">
+                    <span className="hidden xs:inline">JavaScript</span>
+                    <span className="xs:hidden">JS</span> ({jsAssets.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="images" className="flex-1 text-xs sm:text-sm py-1 px-2 sm:px-3">
+                    <span className="hidden xs:inline">Images</span>
+                    <span className="xs:hidden">Img</span> ({imageAssets.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="other" className="flex-1 text-xs sm:text-sm py-1 px-2 sm:px-3">
+                    Other ({otherAssets.length})
+                  </TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="all" className="mt-4">
                   <div className="border rounded-lg overflow-hidden">
-                    <div className="grid grid-cols-12 p-3 bg-gray-50 font-medium text-sm">
+                    {/* Header row - visible on larger screens */}
+                    <div className="hidden sm:grid grid-cols-12 p-3 bg-gray-50 font-medium text-sm">
                       <div className="col-span-1">Type</div>
                       <div className="col-span-10">Path</div>
                       <div className="col-span-1 text-center">Action</div>
                     </div>
-                    <div className="max-h-[500px] overflow-auto">
+                    <div className="max-h-[400px] md:max-h-[500px] overflow-auto">
                       {assets.map((asset, index) => (
                         <div key={index} className="grid grid-cols-12 p-3 border-t text-sm hover:bg-gray-50">
-                          <div className="col-span-1 flex items-center">
+                          <div className="col-span-2 sm:col-span-1 flex items-center">
                             {asset.type === 'css' ? (
                               <FileCode className="h-4 w-4 text-blue-500 mr-2" />
                             ) : asset.type === 'js' ? (
@@ -350,18 +371,32 @@ export default function Preview() {
                             ) : (
                               <FileType className="h-4 w-4 text-gray-500 mr-2" />
                             )}
-                            {asset.type}
+                            <span className="hidden sm:inline">{asset.type}</span>
                           </div>
-                          <div className="col-span-10 truncate text-blue-600">
+                          <div className="col-span-8 sm:col-span-10 truncate text-blue-600">
                             {asset.url ? (
                               <a href={asset.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                {asset.path}
+                                {/* Show truncated path on mobile */}
+                                <span className="sm:hidden">
+                                  {asset.path.length > 20 
+                                    ? `...${asset.path.substring(asset.path.length - 20)}` 
+                                    : asset.path}
+                                </span>
+                                <span className="hidden sm:inline">{asset.path}</span>
                               </a>
                             ) : (
-                              asset.path
+                              <>
+                                {/* Show truncated path on mobile */}
+                                <span className="sm:hidden">
+                                  {asset.path.length > 20 
+                                    ? `...${asset.path.substring(asset.path.length - 20)}` 
+                                    : asset.path}
+                                </span>
+                                <span className="hidden sm:inline">{asset.path}</span>
+                              </>
                             )}
                           </div>
-                          <div className="col-span-1 flex justify-center">
+                          <div className="col-span-2 sm:col-span-1 flex justify-center">
                             {asset.url && (
                               <Button 
                                 variant="ghost" 
@@ -440,28 +475,43 @@ function AssetList({ assets, icon }: { assets: AssetRecord[], icon: React.ReactN
   
   return (
     <div className="border rounded-lg overflow-hidden">
-      <div className="grid grid-cols-12 p-3 bg-gray-50 font-medium text-sm">
+      {/* Header row - visible on larger screens */}
+      <div className="hidden sm:grid grid-cols-12 p-3 bg-gray-50 font-medium text-sm">
         <div className="col-span-1">Type</div>
         <div className="col-span-10">Path</div>
         <div className="col-span-1 text-center">Action</div>
       </div>
-      <div className="max-h-[500px] overflow-auto">
+      <div className="max-h-[400px] md:max-h-[500px] overflow-auto">
         {assets.map((asset, index) => (
           <div key={index} className="grid grid-cols-12 p-3 border-t text-sm hover:bg-gray-50">
-            <div className="col-span-1 flex items-center">
+            <div className="col-span-2 sm:col-span-1 flex items-center">
               {icon}
-              {asset.type}
+              <span className="hidden sm:inline">{asset.type}</span>
             </div>
-            <div className="col-span-10 truncate text-blue-600">
+            <div className="col-span-8 sm:col-span-10 truncate text-blue-600">
               {asset.url ? (
                 <a href={asset.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                  {asset.path}
+                  {/* Show truncated path on mobile */}
+                  <span className="sm:hidden">
+                    {asset.path.length > 20 
+                      ? `...${asset.path.substring(asset.path.length - 20)}` 
+                      : asset.path}
+                  </span>
+                  <span className="hidden sm:inline">{asset.path}</span>
                 </a>
               ) : (
-                asset.path
+                <>
+                  {/* Show truncated path on mobile */}
+                  <span className="sm:hidden">
+                    {asset.path.length > 20 
+                      ? `...${asset.path.substring(asset.path.length - 20)}` 
+                      : asset.path}
+                  </span>
+                  <span className="hidden sm:inline">{asset.path}</span>
+                </>
               )}
             </div>
-            <div className="col-span-1 flex justify-center">
+            <div className="col-span-2 sm:col-span-1 flex justify-center">
               {asset.url && (
                 <Button 
                   variant="ghost" 

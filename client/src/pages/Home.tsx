@@ -244,30 +244,31 @@ export default function Home() {
         )}
         
         {crawlState.previewReady && (
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center mb-4">
-              <div className="flex-shrink-0 bg-green-100 p-2 rounded-full">
-                <CheckCircle className="h-5 w-5 text-green-500" />
+          <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center mb-3 sm:mb-4">
+              <div className="flex-shrink-0 bg-green-100 p-1 sm:p-2 rounded-full">
+                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
               </div>
-              <div className="ml-3">
-                <h3 className="text-lg font-medium text-green-800">Crawl completed!</h3>
-                <p className="text-sm text-green-700">Your site replica is ready to be viewed</p>
+              <div className="ml-2 sm:ml-3">
+                <h3 className="text-base sm:text-lg font-medium text-green-800">Crawl completed!</h3>
+                <p className="text-xs sm:text-sm text-green-700">Your site replica is ready to be viewed</p>
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col xs:flex-row gap-2 sm:gap-3">
               <Button 
                 onClick={() => setLocation(`/preview/${crawlId}`)} 
                 variant="default"
-                className="bg-green-500 hover:bg-green-600"
+                className="bg-green-500 hover:bg-green-600 text-xs sm:text-sm w-full xs:w-auto"
               >
-                <ExternalLink className="h-4 w-4 mr-2" />
+                <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 View Replica
               </Button>
               <Button 
                 onClick={() => setLocation("/history")} 
                 variant="outline"
+                className="text-xs sm:text-sm w-full xs:w-auto"
               >
-                <History className="h-4 w-4 mr-2" />
+                <History className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 View in History
               </Button>
             </div>

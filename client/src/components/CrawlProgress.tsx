@@ -69,17 +69,17 @@ export default function CrawlProgress({
   };
 
   return (
-    <div className="mt-8 max-w-4xl mx-auto">
+    <div className="mt-4 sm:mt-8 max-w-4xl mx-auto">
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center">
+        <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
+          <CardTitle className="text-base sm:text-lg flex items-center">
             {getStatusIcon()}
             {getStatusText()}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           {/* Progress Bar */}
-          <div className="mt-2">
+          <div className="mt-1 sm:mt-2">
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold inline-block text-primary">
@@ -96,22 +96,22 @@ export default function CrawlProgress({
           </div>
           
           {/* Crawl Status */}
-          <div className="mt-5 border rounded-md border-gray-200">
-            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-              <h4 className="text-sm font-medium text-gray-700">Crawl Activity</h4>
+          <div className="mt-4 sm:mt-5 border rounded-md border-gray-200">
+            <div className="bg-gray-50 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-200 flex items-center justify-between">
+              <h4 className="text-xs sm:text-sm font-medium text-gray-700">Crawl Activity</h4>
             </div>
-            <ScrollArea className="h-40">
-              <div className="px-4 py-3">
-                <ul className="space-y-2">
+            <ScrollArea className="h-32 sm:h-40">
+              <div className="px-3 sm:px-4 py-2 sm:py-3">
+                <ul className="space-y-1 sm:space-y-2">
                   {logs.map((log) => (
-                    <li key={log.id} className="text-sm text-gray-600 flex">
+                    <li key={log.id} className="text-xs sm:text-sm text-gray-600 flex">
                       {getLogIcon(log.status)}
-                      <span className="font-mono">{log.message}</span>
+                      <span className="font-mono break-words">{log.message}</span>
                     </li>
                   ))}
                   {status === "in_progress" && (
-                    <li className="text-sm text-gray-600 flex">
-                      <RefreshCw className="h-4 w-4 text-blue-500 mr-2 animate-spin flex-shrink-0" />
+                    <li className="text-xs sm:text-sm text-gray-600 flex">
+                      <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500 mr-2 animate-spin flex-shrink-0" />
                       <span className="font-mono">Crawling in progress...</span>
                     </li>
                   )}
@@ -121,23 +121,23 @@ export default function CrawlProgress({
           </div>
           
           {/* Action Buttons */}
-          <div className="mt-5 flex space-x-3">
+          <div className="mt-4 sm:mt-5 flex space-x-2 sm:space-x-3">
             {status === "in_progress" ? (
               <Button
                 variant="outline"
                 onClick={onPause}
-                className="flex items-center"
+                className="flex items-center text-xs sm:text-sm py-1 sm:py-2 h-8 sm:h-10"
               >
-                <Pause className="h-4 w-4 mr-2" />
+                <Pause className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 Pause
               </Button>
             ) : status === "paused" ? (
               <Button
                 variant="outline"
                 onClick={onPause}
-                className="flex items-center"
+                className="flex items-center text-xs sm:text-sm py-1 sm:py-2 h-8 sm:h-10"
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
+                <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 Resume
               </Button>
             ) : null}
@@ -146,9 +146,9 @@ export default function CrawlProgress({
               <Button
                 variant="destructive"
                 onClick={onCancel}
-                className="flex items-center"
+                className="flex items-center text-xs sm:text-sm py-1 sm:py-2 h-8 sm:h-10"
               >
-                <X className="h-4 w-4 mr-2" />
+                <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 Cancel
               </Button>
             )}
