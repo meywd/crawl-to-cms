@@ -1153,10 +1153,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get all pages for this crawl
-      const pages = await storage.getPagesByCrawlId(id);
+      const pages = await storage.getPagesByCrawlId(crawlId);
       
       // Get assets, potentially filtered by type
-      let assets = await storage.getAssetsByCrawlId(id);
+      let assets = await storage.getAssetsByCrawlId(crawlId);
       
       // Filter assets by type if requested
       if (assetType) {
