@@ -100,8 +100,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/crawl/:id/pause", async (req: Request, res: Response) => {
+  app.post("/api/crawl/:id/pause", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
@@ -110,6 +116,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const crawl = await storage.getCrawl(id);
       if (!crawl) {
         return res.status(404).json({ message: "Crawl not found" });
+      }
+      
+      // Verify the crawl belongs to the authenticated user
+      if (crawl.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to pause this crawl" });
       }
 
       if (crawl.status !== "in_progress") {
@@ -124,8 +135,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/crawl/:id/resume", async (req: Request, res: Response) => {
+  app.post("/api/crawl/:id/resume", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
@@ -134,6 +151,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const crawl = await storage.getCrawl(id);
       if (!crawl) {
         return res.status(404).json({ message: "Crawl not found" });
+      }
+      
+      // Verify the crawl belongs to the authenticated user
+      if (crawl.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to resume this crawl" });
       }
 
       if (crawl.status !== "paused") {
@@ -155,8 +177,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/crawl/:id/cancel", async (req: Request, res: Response) => {
+  app.post("/api/crawl/:id/cancel", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
@@ -165,6 +193,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const crawl = await storage.getCrawl(id);
       if (!crawl) {
         return res.status(404).json({ message: "Crawl not found" });
+      }
+      
+      // Verify the crawl belongs to the authenticated user
+      if (crawl.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to cancel this crawl" });
       }
 
       if (!["in_progress", "paused"].includes(crawl.status)) {
@@ -199,8 +232,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // This route must be after the /api/crawl/history route
-  app.get("/api/crawl/:id", async (req: Request, res: Response) => {
+  app.get("/api/crawl/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
@@ -209,6 +248,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const crawl = await storage.getCrawl(id);
       if (!crawl) {
         return res.status(404).json({ message: "Crawl not found" });
+      }
+      
+      // Verify the crawl belongs to the authenticated user
+      if (crawl.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to access this crawl" });
       }
 
       return res.status(200).json(crawl);
@@ -219,8 +263,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Route to delete crawl history
-  app.delete("/api/crawl/history/:id", async (req: Request, res: Response) => {
+  app.delete("/api/crawl/history/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+    
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
@@ -229,8 +279,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // There's no explicit delete method in our storage interface,
       // so we'll just mark it as cancelled
       const crawl = await storage.getCrawl(id);
+      
       if (!crawl) {
         return res.status(404).json({ message: "Crawl not found" });
+      }
+      
+      // Verify the crawl belongs to the authenticated user
+      if (crawl.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to delete this crawl" });
       }
       
       await storage.updateCrawlStatus(id, "cancelled");
@@ -242,13 +298,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Page routes
-  app.get("/api/pages/:crawlId/:path(*)", async (req: Request, res: Response) => {
+  app.get("/api/pages/:crawlId/:path(*)", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+    
       const crawlId = parseInt(req.params.crawlId);
       const pagePath = req.params.path;
       
       if (isNaN(crawlId)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
+      }
+      
+      // Get the crawl to verify ownership
+      const crawl = await storage.getCrawl(crawlId);
+      if (!crawl) {
+        return res.status(404).json({ message: "Crawl not found" });
+      }
+      
+      // Verify the crawl belongs to the authenticated user
+      if (crawl.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to access pages from this crawl" });
       }
 
       const page = await storage.getPageByPath(crawlId, pagePath);
@@ -263,12 +336,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/pages", async (req: Request, res: Response) => {
+  app.get("/api/pages", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const { crawlId } = req.query;
       
       if (!crawlId || isNaN(parseInt(crawlId as string))) {
         return res.status(400).json({ message: "Invalid or missing crawl ID" });
+      }
+      
+      // Get the crawl to verify ownership
+      const parsedCrawlId = parseInt(crawlId as string);
+      const crawl = await storage.getCrawl(parsedCrawlId);
+      if (!crawl) {
+        return res.status(404).json({ message: "Crawl not found" });
+      }
+      
+      // Verify the crawl belongs to the authenticated user
+      if (crawl.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to access pages from this crawl" });
       }
 
       const pages = await storage.getPagesByCrawlId(parseInt(crawlId as string));
@@ -280,13 +371,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Asset routes
-  app.get("/api/assets/:crawlId/:path(*)", async (req: Request, res: Response) => {
+  app.get("/api/assets/:crawlId/:path(*)", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+    
       const crawlId = parseInt(req.params.crawlId);
       let assetPath = req.params.path;
       
       if (isNaN(crawlId)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
+      }
+      
+      // Get the crawl to verify ownership
+      const crawl = await storage.getCrawl(crawlId);
+      if (!crawl) {
+        return res.status(404).json({ message: "Crawl not found" });
+      }
+      
+      // Verify the crawl belongs to the authenticated user
+      if (crawl.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to access assets from this crawl" });
       }
       
       // Fix duplicated API paths recursively - handle multiple levels of duplication
@@ -912,12 +1020,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Site structure routes
-  app.get("/api/structure/:crawlId", async (req: Request, res: Response) => {
+  app.get("/api/structure/:crawlId", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+    
       const crawlId = parseInt(req.params.crawlId);
       
       if (isNaN(crawlId)) {
         return res.status(400).json({ message: "Invalid crawl ID" });
+      }
+      
+      // Get the crawl to verify ownership
+      const crawl = await storage.getCrawl(crawlId);
+      if (!crawl) {
+        return res.status(404).json({ message: "Crawl not found" });
+      }
+      
+      // Verify the crawl belongs to the authenticated user
+      if (crawl.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to access structure for this crawl" });
       }
 
       const pages = await storage.getPagesByCrawlId(crawlId);
