@@ -1410,6 +1410,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid ID" });
       }
 
+      // Check if this is a background conversion request
+      const isBackgroundConversion = req.query.background === 'true';
+
       // Get the saved site or crawl
       const savedSite = await storage.getSavedSite(id);
       
@@ -1446,6 +1449,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Check if a conversion already exists for this crawl
+      const existingConversion = await storage.getConvertedSiteByCrawlId(crawlId);
+      
+      // If this is a background conversion request, start the conversion in the background
+      if (isBackgroundConversion) {
+        if (existingConversion) {
+          // If a conversion already exists, return it immediately
+          return res.status(200).json({
+            message: "Conversion already exists",
+            convertedSite: existingConversion
+          });
+        }
+
+        // Create a placeholder converted site entry with in-progress status
+        const siteName = savedSite ? savedSite.name : crawl.url.replace(/^https?:\/\//, '');
+        const inProgressConversion = await storage.createConvertedSite({
+          userId,
+          crawlId,
+          savedSiteId: savedSite ? savedSite.id : null,
+          url: crawl.url,
+          name: siteName,
+          framework: "react",
+          status: "in_progress", // Add a status field to the schema if needed
+          pageCount: 0,
+          componentCount: 0,
+          size: 0
+        });
+
+        // Start the conversion process in the background
+        (async () => {
+          try {
+            console.log(`Starting background conversion for crawl ID ${crawlId}...`);
+            
+            // Use the React converter to generate the React application
+            const converter = new ReactConverter(storage);
+            const zip = await converter.convertToReact(crawlId);
+            
+            // Get pages to calculate component count
+            const pages = await storage.getPagesByCrawlId(crawlId);
+            
+            // Generate the ZIP file
+            const zipBlob = await zip.generateAsync({ type: "nodebuffer" });
+            const zipSize = zipBlob.length;
+            
+            // Update the converted site with complete information
+            await storage.updateConvertedSite(inProgressConversion.id, {
+              status: "completed",
+              pageCount: pages.length,
+              componentCount: pages.length + 4, // Pages plus Header, Footer, Layout, Navigation
+              size: zipSize
+            });
+            
+            console.log(`Background conversion for crawl ID ${crawlId} completed successfully.`);
+          } catch (error) {
+            console.error(`Error in background conversion for crawl ID ${crawlId}:`, error);
+            // Update the converted site entry with error status
+            await storage.updateConvertedSite(inProgressConversion.id, {
+              status: "failed"
+            });
+          }
+        })();
+
+        // Return the in-progress conversion immediately
+        return res.status(202).json({
+          message: "Conversion started in background",
+          convertedSite: inProgressConversion
+        });
+      }
+      
+      // If this is a direct download request (not background), handle synchronously
       console.log(`Converting crawl ID ${crawlId} to React application...`);
       
       // Use the React converter to generate the React application
@@ -1462,9 +1535,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create a name for the converted site
       const siteName = savedSite ? savedSite.name : crawl.url.replace(/^https?:\/\//, '');
       
-      // Check if a conversion already exists for this crawl
-      const existingConversion = await storage.getConvertedSiteByCrawlId(crawlId);
-      
       if (!existingConversion) {
         // Save the conversion information to the database
         await storage.createConvertedSite({
@@ -1474,6 +1544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           url: crawl.url,
           name: siteName,
           framework: "react",
+          status: "completed",
           pageCount: pages.length,
           componentCount: pages.length + 4, // Pages plus Header, Footer, Layout, Navigation
           size: zipSize

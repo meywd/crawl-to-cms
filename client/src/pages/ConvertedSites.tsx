@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getConvertedSites, deleteConvertedSite, downloadConvertedSite } from '@/lib/api';
 import { Button } from "@/components/ui/button";
@@ -7,9 +7,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistance } from 'date-fns';
-import { Download, Trash2, Coffee } from 'lucide-react';
+import { Download, Trash2, Coffee, Loader2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { type ConvertedSite } from '@/types';
+import { Progress } from '@/components/ui/progress';
+import { type ConvertedSite, type ConversionStatus } from '@/types';
 
 const ConvertedSites: React.FC = () => {
   const { toast } = useToast();
@@ -19,6 +20,7 @@ const ConvertedSites: React.FC = () => {
   const { data: convertedSites, isLoading, error } = useQuery({
     queryKey: ['/api/sites/converted'],
     queryFn: getConvertedSites,
+    refetchInterval: 5000 // Refetch every 5 seconds to update conversion progress
   });
 
   // Delete site mutation
@@ -139,40 +141,112 @@ const ConvertedSites: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">React:</span>
-                  <Badge variant="outline">{site.reactVersion}</Badge>
+                  <span className="text-sm text-muted-foreground">Status:</span>
+                  {site.status === 'in_progress' ? (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      Converting
+                    </Badge>
+                  ) : site.status === 'failed' ? (
+                    <Badge variant="destructive">
+                      <AlertTriangle className="w-3 h-3 mr-1" />
+                      Failed
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">
+                      Completed
+                    </Badge>
+                  )}
                 </div>
+                
+                {site.status === 'in_progress' && (
+                  <div className="mt-2">
+                    <Progress className="h-2 mb-1" value={45} />
+                    <p className="text-xs text-center text-muted-foreground">Converting to React application...</p>
+                  </div>
+                )}
+                
+                {site.reactVersion && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">React:</span>
+                    <Badge variant="outline">{site.reactVersion}</Badge>
+                  </div>
+                )}
+                
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Pages:</span>
                   <span className="text-sm font-medium">{site.pageCount}</span>
                 </div>
+                
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Size:</span>
                   <span className="text-sm font-medium">{formatBytes(site.size)}</span>
                 </div>
+                
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Converted:</span>
                   <span className="text-sm font-medium">{formatRelativeTime(site.convertedAt)}</span>
                 </div>
+                
+                {site.error && (
+                  <div className="mt-2 p-2 bg-red-50 text-red-800 text-xs rounded border border-red-200">
+                    <p className="font-semibold">Error:</p>
+                    <p className="line-clamp-3">{site.error}</p>
+                  </div>
+                )}
+                
                 <Separator className="my-2" />
               </CardContent>
               <CardFooter className="flex justify-between gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex-1"
-                  onClick={() => handleDownload(site)}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => handleDelete(site.id)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {site.status === 'completed' ? (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => handleDownload(site)}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => handleDelete(site.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </>
+                ) : site.status === 'in_progress' ? (
+                  <Button 
+                    disabled
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                  >
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Converting...
+                  </Button>
+                ) : (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      disabled
+                    >
+                      <AlertTriangle className="w-4 h-4 mr-2" />
+                      Failed
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => handleDelete(site.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
               </CardFooter>
             </Card>
           ))}

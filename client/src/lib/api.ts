@@ -106,9 +106,9 @@ export async function getSiteStructure(crawlId: string): Promise<any> {
 }
 
 // React conversion API function
-export async function convertToReact(id: string): Promise<void> {
-  // The API handles the download directly through the browser
-  window.open(`/api/sites/convert/${id}`, '_blank');
+export async function convertToReact(id: string): Promise<any> {
+  const response = await apiRequest("GET", `/api/sites/convert/${id}?background=true`, undefined);
+  return response.json();
 }
 
 // Converted sites API functions

@@ -17,7 +17,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import ReplicatedSitePreview from "@/components/ReplicatedSitePreview";
 import SiteStructure from "@/components/SiteStructure";
-import { saveSite } from "@/lib/api";
+import { saveSite, convertToReact } from "@/lib/api";
 
 // Asset types for display
 type AssetRecord = {
@@ -283,12 +283,26 @@ export default function Preview() {
                       <Archive className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                       Download All as ZIP
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => {
-                      window.open(`/api/sites/convert/${crawlId}`, '_blank');
-                      toast({
-                        title: "React conversion started",
-                        description: "Converting site to a React application. Download will begin shortly."
-                      });
+                    <DropdownMenuItem onClick={async () => {
+                      try {
+                        // Use the API convertToReact function for background conversion
+                        await convertToReact(crawlId);
+                        
+                        toast({
+                          title: "React conversion started",
+                          description: "Converting site to a React application. You'll be redirected to the React Sites tab."
+                        });
+                        
+                        // Navigate to converted sites page
+                        setLocation("/converted-sites");
+                      } catch (error) {
+                        console.error("Error converting site to React:", error);
+                        toast({
+                          title: "Error",
+                          description: "Failed to start React conversion",
+                          variant: "destructive",
+                        });
+                      }
                     }} className="text-xs sm:text-sm">
                       <FileCode className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500 mr-1 sm:mr-2" />
                       Convert to React App

@@ -74,9 +74,11 @@ export const convertedSites = pgTable("converted_sites", {
   url: text("url").notNull(),
   name: text("name"),
   framework: text("framework").notNull().default("react"),
+  status: text("status").notNull().default("completed"),
   pageCount: integer("page_count").notNull(),
   componentCount: integer("component_count").notNull().default(0),
   size: integer("size").notNull(),
+  error: text("error"),
   convertedAt: timestamp("converted_at").notNull().defaultNow(),
 });
 
@@ -113,7 +115,8 @@ export const insertSavedSiteSchema = createInsertSchema(savedSites).omit({
 
 export const insertConvertedSiteSchema = createInsertSchema(convertedSites).omit({
   id: true,
-  convertedAt: true
+  convertedAt: true,
+  error: true
 });
 
 // Authentication schemas

@@ -62,6 +62,7 @@ export interface IStorage {
   getConvertedSite(id: number): Promise<ConvertedSite | undefined>;
   getConvertedSites(userId: number): Promise<ConvertedSite[]>;
   getConvertedSiteByCrawlId(crawlId: number): Promise<ConvertedSite | undefined>;
+  updateConvertedSite(id: number, updates: Partial<InsertConvertedSite>): Promise<ConvertedSite | undefined>;
   deleteConvertedSite(id: number): Promise<boolean>;
 }
 
@@ -422,6 +423,15 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(convertedSites)
       .where(eq(convertedSites.crawlId, crawlId));
+    return result;
+  }
+
+  async updateConvertedSite(id: number, updates: Partial<InsertConvertedSite>): Promise<ConvertedSite | undefined> {
+    const [result] = await db
+      .update(convertedSites)
+      .set(updates)
+      .where(eq(convertedSites.id, id))
+      .returning();
     return result;
   }
 
