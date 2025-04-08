@@ -1166,14 +1166,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get site URL from crawl or from a page
       const siteUrl = crawl ? crawl.url : (pages.length > 0 ? new URL(pages[0].url).hostname : 'site');
       
-      // Generate a readable title based on the asset type (if filtered)
+      // Create zip file with JSZip
+      const JSZip = require('jszip');
+      const zip = new JSZip();
+      
+      // Add an info.html file with basic information
       const typeTitle = assetType 
         ? `${assetType.charAt(0).toUpperCase() + assetType.slice(1)} Files` 
         : 'Complete Site';
       
-      // This would normally generate a zip file with all content
-      // For this demo, we'll just return a simple HTML listing
-      let html = `<!DOCTYPE html>
+      let infoHtml = `<!DOCTYPE html>
       <html>
       <head>
         <title>Downloaded ${typeTitle}: ${siteUrl}</title>
@@ -1205,14 +1207,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         </ul>
       </body>
       </html>`;
-
-      const filename = assetType 
-        ? `${siteUrl.replace(/[^a-z0-9]/gi, '_')}_${assetType}.html` 
-        : `${siteUrl.replace(/[^a-z0-9]/gi, '_')}.html`;
       
-      res.setHeader('Content-Type', 'text/html');
+      // Add info.html to the zip
+      zip.file("info.html", infoHtml);
+      
+      // Create folders for different asset types
+      const pagesFolder = zip.folder("pages");
+      const cssFolder = zip.folder("css");
+      const jsFolder = zip.folder("js");
+      const imagesFolder = zip.folder("images");
+      const otherFolder = zip.folder("other");
+      
+      // Add HTML pages to the zip
+      if (!assetType) {
+        for (const page of pages) {
+          // Clean up path for folder structure
+          const pagePath = page.path.replace(/^\//, ''); // Remove leading slash
+          pagesFolder.file(pagePath || "index.html", page.content);
+        }
+      }
+      
+      // Add assets to the zip based on their type
+      for (const asset of assets) {
+        // Clean up path for folder structure
+        const assetPath = asset.path.replace(/^\//, ''); // Remove leading slash
+        const fileName = assetPath.split('/').pop() || 'file';
+        
+        // Check if the content is base64 encoded (images) or text
+        let content = asset.content;
+        
+        // Base64 decode image content
+        if (asset.type === 'image' && content) {
+          try {
+            // For images, the content is stored as base64 string
+            content = Buffer.from(content, 'base64');
+          } catch (error) {
+            console.error(`Error decoding image content for ${assetPath}:`, error);
+            // Use content as is if there's an error
+          }
+        }
+        
+        // Add file to the appropriate folder
+        switch (asset.type) {
+          case 'css':
+            cssFolder.file(fileName, content);
+            break;
+          case 'js':
+            jsFolder.file(fileName, content);
+            break;
+          case 'image':
+            imagesFolder.file(fileName, content);
+            break;
+          default:
+            otherFolder.file(fileName, content);
+        }
+      }
+      
+      // Generate the zip file
+      const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
+      
+      // Prepare file name for download
+      const filename = assetType 
+        ? `${siteUrl.replace(/[^a-z0-9]/gi, '_')}_${assetType}.zip` 
+        : `${siteUrl.replace(/[^a-z0-9]/gi, '_')}.zip`;
+      
+      // Send the zip file as response
+      res.setHeader('Content-Type', 'application/zip');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      return res.status(200).send(html);
+      return res.status(200).send(zipContent);
     } catch (error) {
       console.error("Error downloading site:", error);
       return res.status(500).json({ message: "Internal server error" });
