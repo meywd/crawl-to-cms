@@ -1251,7 +1251,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (!user) {
-          return res.status(401).json({ message: info.message || 'Invalid credentials' });
+          return res.status(401).json({ 
+            success: false,
+            message: info.message || 'Invalid credentials' 
+          });
         }
         
         req.login(user, (loginErr) => {
@@ -1261,19 +1264,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           return res.status(200).json({ 
+            success: true,
             user: {
               id: user.id,
               username: user.username,
-              email: user.email
+              email: user.email,
+              createdAt: user.createdAt || new Date().toISOString(),
+              lastLogin: user.lastLogin
             } 
           });
         });
       })(req, res, next);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: error.message });
+        return res.status(400).json({ 
+          success: false,
+          message: error.message
+        });
       }
       return res.status(400).json({ 
+        success: false,
         message: error instanceof Error ? error.message : 'Login validation failed' 
       });
     }
@@ -1308,6 +1318,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: user.username,
         email: user.email
       }
+    });
+  });
+  
+  // Add alias route for /api/auth/me that matches the client API call
+  app.get('/api/auth/me', (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(200).json(null);
+    }
+    
+    const user = req.user as any;
+    // Return the user object directly, not wrapped in a 'user' property
+    return res.status(200).json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      createdAt: user.createdAt || new Date().toISOString(),
+      lastLogin: user.lastLogin
     });
   });
 
