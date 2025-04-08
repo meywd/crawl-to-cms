@@ -261,6 +261,16 @@ export default function Preview() {
                       <Archive className="h-4 w-4 mr-2" />
                       Download All as ZIP
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      window.open(`/api/sites/convert/${crawlId}`, '_blank');
+                      toast({
+                        title: "React conversion started",
+                        description: "Converting site to a React application. Download will begin shortly."
+                      });
+                    }}>
+                      <FileCode className="h-4 w-4 text-purple-500 mr-2" />
+                      Convert to React App
+                    </DropdownMenuItem>
                     {cssAssets.length > 0 && (
                       <DropdownMenuItem onClick={() => {
                         window.open(`/api/sites/download/${crawlId}?type=css`, '_blank');

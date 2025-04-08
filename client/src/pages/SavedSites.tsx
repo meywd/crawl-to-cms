@@ -1,11 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Database, Globe, ExternalLink, Trash2, Download } from "lucide-react";
+import { Database, Globe, ExternalLink, Trash2, Download, FileCode } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { deleteSavedSite, getSavedSites } from "@/lib/api";
+import { deleteSavedSite, getSavedSites, convertToReact } from "@/lib/api";
 import { type SavedSite } from "@/types";
 
 export default function SavedSitesPage() {
@@ -67,6 +67,23 @@ export default function SavedSitesPage() {
       toast({
         title: "Error",
         description: "Failed to download site",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleConvertToReact = async (site: SavedSite) => {
+    try {
+      convertToReact(site.id.toString());
+      
+      toast({
+        title: "React conversion started",
+        description: "Converting site to a React application. Download will begin shortly.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to convert site to React",
         variant: "destructive",
       });
     }
@@ -134,6 +151,15 @@ export default function SavedSitesPage() {
                       >
                         <Download className="h-4 w-4 mr-1" />
                         Download
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="text-purple-500 hover:text-purple-700"
+                        onClick={() => handleConvertToReact(site)}
+                      >
+                        <FileCode className="h-4 w-4 mr-1" />
+                        To React
                       </Button>
                       <Button 
                         variant="outline" 
