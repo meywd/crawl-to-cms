@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
 import JSZip from 'jszip';
+import { franc } from 'franc';
 
 /**
  * Utility class to convert crawled HTML/CSS/JS into a functioning React application
@@ -366,7 +367,7 @@ model Setting {
           const src = $(el).attr('src');
           if (src && src.startsWith(`/api/assets/${crawlId}/`)) {
             const newSrc = src.replace(`/api/assets/${crawlId}/assets/`, './assets/');
-            $(el).attr('src', `{require("${newSrc}")}`);
+            $(el).attr('src', `{import.meta.url.replace(/\\/[^/]*$/, '')}/${newSrc}`);
           }
         });
         
@@ -1044,7 +1045,7 @@ This project is provided as-is, with no warranties or guarantees.
       
       // Use franc to detect the language (will return ISO 639-3 codes)
       const detectedLang = cleanText.length > 10 ? 
-        require('franc')(cleanText) : 'eng';
+        franc(cleanText) : 'eng';
       
       // Map from ISO 639-3 to our language codes
       const langMap: Record<string, string> = {
