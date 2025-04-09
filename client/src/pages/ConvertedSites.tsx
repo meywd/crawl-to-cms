@@ -7,7 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistance } from 'date-fns';
-import { Download, Trash2, Coffee, Loader2, AlertTriangle } from 'lucide-react';
+import { Download, Trash2, Coffee, Loader2, AlertTriangle, Search } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { type ConvertedSite, type ConversionStatus } from '@/types';
@@ -15,6 +16,7 @@ import { type ConvertedSite, type ConversionStatus } from '@/types';
 const ConvertedSites: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   // Fetch converted sites
   const { data: convertedSites, isLoading, error } = useQuery({
@@ -200,6 +202,15 @@ const ConvertedSites: React.FC = () => {
               <CardFooter className="flex justify-between gap-2">
                 {site.status === 'completed' ? (
                   <>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => setLocation(`/preview-converted/${site.id}`)}
+                    >
+                      <Search className="w-4 h-4 mr-2" />
+                      Preview
+                    </Button>
                     <Button 
                       variant="outline" 
                       size="sm" 

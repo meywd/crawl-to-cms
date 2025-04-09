@@ -125,3 +125,13 @@ export async function downloadConvertedSite(id: string): Promise<void> {
   // Open the download URL in a new tab
   window.open(`/api/sites/download/${id}`, '_blank');
 }
+
+export async function previewConvertedSite(id: string): Promise<any> {
+  const response = await apiRequest("GET", `/api/sites/preview/${id}`, undefined);
+  return response.json();
+}
+
+export async function getConvertedSiteFileContent(id: string, path: string): Promise<any> {
+  const response = await apiRequest("GET", `/api/sites/preview/${id}/file?path=${encodeURIComponent(path)}`, undefined);
+  return response.json();
+}

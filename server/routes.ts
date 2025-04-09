@@ -38,6 +38,55 @@ function isValidUrl(urlString: string): boolean {
   }
 }
 
+// Helper function to build a file tree structure from a flat list of files
+function buildFileTree(fileList: Array<{ path: string; size: number; type: string }>) {
+  const root: Record<string, any> = { type: 'directory', name: '/', children: {} };
+  
+  for (const file of fileList) {
+    const parts = file.path.split('/');
+    let current = root;
+    
+    // Build the directory structure
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      if (!part) continue; // Skip empty parts
+      
+      if (!current.children[part]) {
+        current.children[part] = { type: 'directory', name: part, children: {} };
+      }
+      current = current.children[part];
+    }
+    
+    // Add the file to the current directory
+    const fileName = parts[parts.length - 1];
+    if (fileName) {
+      current.children[fileName] = {
+        type: 'file',
+        name: fileName,
+        size: file.size,
+        fileType: file.type,
+        path: file.path
+      };
+    }
+  }
+  
+  // Convert the nested objects to arrays for easier rendering
+  function convertToArray(node: Record<string, any>) {
+    if (node.type === 'directory') {
+      const children = Object.values(node.children).map((child: any) => convertToArray(child));
+      // Sort directories first, then files
+      children.sort((a, b) => {
+        if (a.type === b.type) return a.name.localeCompare(b.name);
+        return a.type === 'directory' ? -1 : 1;
+      });
+      return { ...node, children };
+    }
+    return node;
+  }
+  
+  return convertToArray(root).children;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Crawl routes
   app.post("/api/crawl", isAuthenticated, async (req: Request, res: Response) => {
@@ -1110,6 +1159,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Download routes
+  // API endpoint to preview a converted site's file structure
+  app.get("/api/sites/preview/:id", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+    
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID" });
+      }
+      
+      // Check if this is a converted site ID first
+      const convertedSite = await storage.getConvertedSite(id);
+      
+      // If this is a converted site
+      if (convertedSite) {
+        // Verify the converted site belongs to the authenticated user
+        if (convertedSite.userId !== userId) {
+          return res.status(403).json({ message: "You don't have permission to preview this converted site" });
+        }
+        
+        // Check if the conversion is still in progress
+        if (convertedSite.status === 'in_progress') {
+          return res.status(202).json({ message: "Conversion is still in progress", status: "in_progress" });
+        }
+        
+        // Check if the conversion failed
+        if (convertedSite.status === 'failed') {
+          return res.status(400).json({ message: "Conversion failed", error: convertedSite.error });
+        }
+        
+        console.log(`Previewing converted site ${id} structure`);
+        
+        // Use the React converter to generate or fetch the React application structure
+        const converter = new ReactConverter(storage);
+        const zip = await converter.convertToReact(convertedSite.crawlId);
+        
+        // Get all file entries from the zip
+        const fileList: { path: string; size: number; type: string }[] = [];
+        
+        // Process each file in the zip
+        zip.forEach((relativePath, zipEntry) => {
+          if (!zipEntry.dir) {
+            // Determine the file type
+            let type = "other";
+            if (relativePath.endsWith(".js") || relativePath.endsWith(".jsx") || 
+                relativePath.endsWith(".ts") || relativePath.endsWith(".tsx")) {
+              type = "script";
+            } else if (relativePath.endsWith(".css")) {
+              type = "style";
+            } else if (relativePath.endsWith(".html")) {
+              type = "html";
+            } else if (relativePath.endsWith(".json")) {
+              type = "json";
+            } else if (relativePath.match(/\.(jpg|jpeg|png|gif|svg|webp)$/i)) {
+              type = "image";
+            }
+            
+            fileList.push({
+              path: relativePath,
+              size: zipEntry._data ? zipEntry._data.uncompressedSize : 0,
+              type
+            });
+          }
+        });
+        
+        // Organize files into directory structure
+        const fileTree = buildFileTree(fileList);
+        
+        // Return the file structure
+        return res.json({
+          name: convertedSite.name || "React Application",
+          files: fileTree,
+          totalFiles: fileList.length,
+          totalSize: fileList.reduce((sum, file) => sum + file.size, 0)
+        });
+      } else {
+        return res.status(404).json({ message: "Converted site not found" });
+      }
+    } catch (error) {
+      console.error("Error previewing converted site:", error);
+      res.status(500).json({ message: "Error previewing converted site", error: (error as Error).message });
+    }
+  });
+
+  // API endpoint to get the content of a specific file in a converted site
+  app.get("/api/sites/preview/:id/file", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+    
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID" });
+      }
+      
+      const filePath = req.query.path as string;
+      if (!filePath) {
+        return res.status(400).json({ message: "File path is required" });
+      }
+      
+      // Check if this is a converted site ID first
+      const convertedSite = await storage.getConvertedSite(id);
+      
+      // If this is a converted site
+      if (convertedSite) {
+        // Verify the converted site belongs to the authenticated user
+        if (convertedSite.userId !== userId) {
+          return res.status(403).json({ message: "You don't have permission to preview this converted site" });
+        }
+        
+        console.log(`Retrieving file content for ${filePath} from converted site ${id}`);
+        
+        // Use the React converter to generate or fetch the React application
+        const converter = new ReactConverter(storage);
+        const zip = await converter.convertToReact(convertedSite.crawlId);
+        
+        // Get the content of the specific file
+        const fileEntry = zip.file(filePath);
+        if (!fileEntry) {
+          return res.status(404).json({ message: "File not found in the converted site" });
+        }
+        
+        // Get the file content as text or base64 for binary files
+        const fileContent = await fileEntry.async('string');
+        
+        // Determine content type based on file extension
+        const fileExtension = filePath.split('.').pop()?.toLowerCase();
+        let contentType = 'text/plain';
+        
+        if (fileExtension === 'js' || fileExtension === 'jsx' || fileExtension === 'ts' || fileExtension === 'tsx') {
+          contentType = 'application/javascript';
+        } else if (fileExtension === 'html') {
+          contentType = 'text/html';
+        } else if (fileExtension === 'css') {
+          contentType = 'text/css';
+        } else if (fileExtension === 'json') {
+          contentType = 'application/json';
+        } else if (['jpg', 'jpeg', 'png', 'gif', 'svg'].includes(fileExtension || '')) {
+          contentType = `image/${fileExtension}`;
+        }
+        
+        // Return the file content with appropriate content type
+        return res.json({
+          path: filePath,
+          content: fileContent,
+          contentType
+        });
+      } else {
+        return res.status(404).json({ message: "Converted site not found" });
+      }
+    } catch (error) {
+      console.error("Error retrieving file content:", error);
+      res.status(500).json({ message: "Error retrieving file content", error: (error as Error).message });
+    }
+  });
+
   app.get("/api/sites/download/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
       // Get user ID from the request

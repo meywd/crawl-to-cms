@@ -10,6 +10,7 @@ import History from "@/pages/History";
 import SavedSites from "@/pages/SavedSites";
 import ConvertedSites from "@/pages/ConvertedSites";
 import Preview from "@/pages/Preview";
+import ConvertedSitePreview from "@/pages/ConvertedSitePreview";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Header from "@/components/Header";
@@ -38,6 +39,11 @@ function Router() {
         </PrivateRoute>
       </Route>
       <Route path="/preview/:id" component={Preview} />
+      <Route path="/preview-converted/:id">
+        <PrivateRoute>
+          <ConvertedSitePreview />
+        </PrivateRoute>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -48,13 +54,14 @@ function App() {
   
   // Show navigation tabs only on main pages, not on login, register, preview or 404
   const showNavigation = location === '/' || location === '/history' || location === '/saved-sites' || location === '/converted-sites';
+  const isPreviewPage = location.startsWith('/preview/') || location.startsWith('/preview-converted/');
   
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <div className="flex flex-col min-h-screen">
           <Header />
-          <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <main className={`flex-grow w-full mx-auto py-6 ${isPreviewPage ? 'px-0' : 'max-w-7xl px-4 sm:px-6 lg:px-8'}`}>
             {showNavigation && <Navigation />}
             <Router />
           </main>
