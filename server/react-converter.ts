@@ -23,7 +23,7 @@ export class ReactConverter {
    */
   private generateTailwindConfig(): string {
     return `/** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -73,7 +73,7 @@ module.exports = {
    * Generate the PostCSS config file
    */
   private generatePostCssConfig(): string {
-    return `module.exports = {
+    return `export default {
   plugins: {
     tailwindcss: {},
     autoprefixer: {},
@@ -255,8 +255,8 @@ model Setting {
     zip.file("vite.config.ts", this.generateViteConfig());
     zip.file("index.html", this.generateIndexHtml(siteName));
     zip.file("README.md", this.generateReadme(siteName, crawl.url));
-    zip.file("tailwind.config.js", this.generateTailwindConfig());
-    zip.file("postcss.config.js", this.generatePostCssConfig());
+    zip.file("tailwind.config.mjs", this.generateTailwindConfig());
+    zip.file("postcss.config.mjs", this.generatePostCssConfig());
     zip.file(".env", this.generateEnvFile());
     
     // Create prisma folder and database schema
@@ -713,6 +713,9 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  css: {
+    postcss: './postcss.config.mjs',
   },
 });`;
   }
