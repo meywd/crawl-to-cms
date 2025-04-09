@@ -297,6 +297,7 @@ model Setting {
     const localesFolder = srcFolder.folder("locales")!;
     localesFolder.file("en.json", this.generateEnglishTranslations(pages));
     localesFolder.file("es.json", this.generateSpanishTranslations(pages));
+    localesFolder.file("ar.json", this.generateArabicTranslations(pages));
     
     // Create TypeScript types folder
     const typesFolder = srcFolder.folder("types")!;
@@ -1046,14 +1047,15 @@ This project is provided as-is, with no warranties or guarantees.
         require('franc')(cleanText) : 'eng';
       
       // Map from ISO 639-3 to our language codes
-      const langMap = {
-        'eng': 'en',
-        'spa': 'es',
-        'und': 'en' // Default to English when uncertain
+      const langMap: Record<string, string> = {
+        'eng': 'en',  // English
+        'spa': 'es',  // Spanish
+        'ara': 'ar',  // Arabic
+        'und': 'en'   // Default to English when uncertain
       };
       
       // Use detected language or default to English
-      const primaryLang = langMap[detectedLang] || 'en';
+      const primaryLang = langMap[detectedLang as keyof typeof langMap] || 'en';
       // Secondary language will be the other supported language
       const secondaryLang = primaryLang === 'en' ? 'es' : 'en';
       
@@ -1098,6 +1100,14 @@ async function main() {
     },
   });
 
+  const arabic = await prisma.language.create({
+    data: {
+      code: 'ar',
+      name: 'Arabic',
+      isActive: true,
+    },
+  });
+
   // Create Admin user
   await prisma.user.create({
     data: {
@@ -1118,9 +1128,21 @@ async function main() {
       },
     });
 
-    // Get the language IDs
-    const primaryLangId = page.primaryLang === 'en' ? english.id : spanish.id;
-    const secondaryLangId = page.secondaryLang === 'en' ? english.id : spanish.id;
+    // Get the language IDs based on detected language
+    let primaryLangId: number;
+    if (page.primaryLang === 'en') {
+      primaryLangId = english.id;
+    } else if (page.primaryLang === 'es') {
+      primaryLangId = spanish.id;
+    } else if (page.primaryLang === 'ar') {
+      primaryLangId = arabic.id;
+    } else {
+      // Default to English if language not supported
+      primaryLangId = english.id;
+    }
+    
+    // Secondary language (simplified for now to just use English if not the primary)
+    const secondaryLangId = english.id;
     
     // Primary language content (original language)
     await prisma.pageContent.create({
@@ -1195,6 +1217,18 @@ async function main() {
           '<p>This content needs translation.</p>',
       },
     });
+    
+    // Create placeholder section in Arabic
+    await prisma.section.create({
+      data: {
+        pageId: newPage.id,
+        languageId: arabic.id,
+        type: 'content',
+        order: 1,
+        title: 'المحتوى الرئيسي',
+        content: '<p>هذا المحتوى بحاجة إلى ترجمة.</p>',
+      },
+    });
 
     // Create menu items
     await prisma.menuItem.create({
@@ -1212,6 +1246,18 @@ async function main() {
       data: {
         languageId: spanish.id,
         title: page.primaryLang === 'es' ? page.title : \`\${page.title} (ES)\`,
+        slug: page.slug,
+        order: newPage.id,
+        pageId: newPage.id,
+        isActive: true,
+      },
+    });
+    
+    // Create Arabic menu item
+    await prisma.menuItem.create({
+      data: {
+        languageId: arabic.id,
+        title: page.primaryLang === 'ar' ? page.title : \`\${page.title} (AR)\`,
         slug: page.slug,
         order: newPage.id,
         pageId: newPage.id,
@@ -1355,7 +1401,6 @@ main()
     }
     
     return sections;
-  }
   }
   
   /**
@@ -1945,6 +1990,7 @@ import Backend from 'i18next-http-backend';
 // Import translations
 import enTranslation from './locales/en.json';
 import esTranslation from './locales/es.json';
+import arTranslation from './locales/ar.json';
 
 // Initialize i18next
 i18n
@@ -1966,6 +2012,9 @@ i18n
       },
       es: {
         translation: esTranslation
+      },
+      ar: {
+        translation: arTranslation
       }
     }
   });
@@ -2042,7 +2091,7 @@ export const adminRoutes: RouteObject[] = [
    */
   private generateEnglishTranslations(pages: Page[]): string {
     // Extract page titles for translations
-    const pageTitles = pages.reduce((acc, page) => {
+    const pageTitles = pages.reduce<Record<string, string>>((acc, page) => {
       const pageName = this.getPageComponentName(page.path);
       const title = this.extractTitle(page.content) || pageName;
       acc[`page_${pageName.toLowerCase()}`] = title;
@@ -2084,7 +2133,7 @@ export const adminRoutes: RouteObject[] = [
    */
   private generateSpanishTranslations(pages: Page[]): string {
     // Extract page titles for translations
-    const pageTitles = pages.reduce((acc, page) => {
+    const pageTitles = pages.reduce<Record<string, string>>((acc, page) => {
       const pageName = this.getPageComponentName(page.path);
       const title = this.extractTitle(page.content) || pageName;
       acc[`page_${pageName.toLowerCase()}`] = `${title} (ES)`;
@@ -2112,6 +2161,48 @@ export const adminRoutes: RouteObject[] = [
         "password": "Contraseña",
         "title": "Título",
         "description": "Descripción"
+      },
+      "pages": {
+        ...pageTitles
+      }
+    };
+    
+    return JSON.stringify(translations, null, 2);
+  }
+  
+  /**
+   * Generate Arabic translations
+   */
+  private generateArabicTranslations(pages: Page[]): string {
+    // Extract page titles for translations
+    const pageTitles = pages.reduce<Record<string, string>>((acc, page) => {
+      const pageName = this.getPageComponentName(page.path);
+      const title = this.extractTitle(page.content) || pageName;
+      acc[`page_${pageName.toLowerCase()}`] = `${title} (AR)`;
+      return acc;
+    }, {});
+    
+    const translations = {
+      "common": {
+        "admin": "مدير",
+        "login": "تسجيل الدخول",
+        "logout": "تسجيل الخروج",
+        "register": "تسجيل",
+        "dashboard": "لوحة القيادة",
+        "settings": "إعدادات",
+        "pages": "صفحات",
+        "menu": "قائمة",
+        "content": "محتوى",
+        "save": "حفظ",
+        "cancel": "إلغاء",
+        "delete": "حذف",
+        "edit": "تعديل",
+        "create": "إنشاء",
+        "name": "اسم",
+        "email": "بريد إلكتروني",
+        "password": "كلمة المرور",
+        "title": "عنوان",
+        "description": "وصف"
       },
       "pages": {
         ...pageTitles
@@ -2187,7 +2278,7 @@ export default function Dashboard() {
         
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="font-semibold text-lg mb-2">{t('common.languages')}</h2>
-          <p className="text-3xl font-bold text-primary-600">2</p>
+          <p className="text-3xl font-bold text-primary-600">3</p>
         </div>
       </div>
     </div>
