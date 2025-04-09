@@ -74,7 +74,13 @@ export const convertedSites = pgTable("converted_sites", {
   url: text("url").notNull(),
   name: text("name"),
   framework: text("framework").notNull().default("react"),
-  status: text("status").notNull().default("completed"),
+  // Modified to support more detailed conversion states:
+  // started - conversion has begun
+  // processing - actively converting files
+  // completed - conversion finished successfully
+  // failed - conversion failed with errors
+  status: text("status").notNull().default("started"),
+  progressPercent: integer("progress_percent").default(0),
   pageCount: integer("page_count").notNull(),
   componentCount: integer("component_count").notNull().default(0),
   size: integer("size").notNull(),

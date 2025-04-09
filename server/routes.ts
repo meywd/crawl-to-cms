@@ -1706,7 +1706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // Create a placeholder converted site entry with in-progress status
+        // Create a placeholder converted site entry with started status
         const siteName = savedSite ? savedSite.name : crawl.url.replace(/^https?:\/\//, '');
         const inProgressConversion = await storage.createConvertedSite({
           userId,
@@ -1715,7 +1715,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           url: crawl.url,
           name: siteName,
           framework: "react",
-          status: "in_progress", // Add a status field to the schema if needed
+          status: "started", // Initial status is "started"
+          progressPercent: 0,
           pageCount: 0,
           componentCount: 0,
           size: 0
@@ -1726,20 +1727,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             console.log(`Starting background conversion for crawl ID ${crawlId}...`);
             
+            // Update status to "processing" and progress to 10%
+            await storage.updateConvertedSite(inProgressConversion.id, {
+              status: "processing",
+              progressPercent: 10
+            });
+            
             // Use the React converter to generate the React application
             const converter = new ReactConverter(storage);
+            
+            // Get pages and assets to calculate component count and report progress
+            const pages = await storage.getPagesByCrawlId(crawlId);
+            
+            // Update to "in_progress" status and 30% progress
+            await storage.updateConvertedSite(inProgressConversion.id, {
+              status: "in_progress",
+              progressPercent: 30,
+              pageCount: pages.length
+            });
+            
+            // Start the actual conversion (this can take some time)
             const zip = await converter.convertToReact(crawlId);
             
-            // Get pages to calculate component count
-            const pages = await storage.getPagesByCrawlId(crawlId);
+            // Update progress to 75%
+            await storage.updateConvertedSite(inProgressConversion.id, {
+              progressPercent: 75
+            });
             
             // Generate the ZIP file
             const zipBlob = await zip.generateAsync({ type: "nodebuffer" });
             const zipSize = zipBlob.length;
             
+            // Update progress to 90%
+            await storage.updateConvertedSite(inProgressConversion.id, {
+              progressPercent: 90
+            });
+            
             // Update the converted site with complete information
             await storage.updateConvertedSite(inProgressConversion.id, {
               status: "completed",
+              progressPercent: 100,
               pageCount: pages.length,
               componentCount: pages.length + 4, // Pages plus Header, Footer, Layout, Navigation
               size: zipSize
@@ -1789,6 +1816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: siteName,
           framework: "react",
           status: "completed",
+          progressPercent: 100,
           pageCount: pages.length,
           componentCount: pages.length + 4, // Pages plus Header, Footer, Layout, Navigation
           size: zipSize

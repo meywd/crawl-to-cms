@@ -11,11 +11,13 @@ import os from 'os';
 const execAsync = promisify(exec);
 
 // Directory to store extracted sites for preview
-const PREVIEW_DIR = path.join(os.tmpdir(), 'web-crawler-previews');
+// Use a directory in the project root for better persistence and debugging
+const PREVIEW_DIR = path.join(process.cwd(), 'preview-sites');
 
 // Ensure preview directory exists
 if (!fs.existsSync(PREVIEW_DIR)) {
   fs.mkdirSync(PREVIEW_DIR, { recursive: true });
+  console.log(`Created preview directory at ${PREVIEW_DIR}`);
 }
 
 /**
@@ -44,95 +46,115 @@ export class PreviewServer {
   private setupRoutes() {
     // Debug middleware to log all preview requests
     this.app.use('/preview', (req, res, next) => {
-      console.log(`Preview request: ${req.url}`);
+      console.log(`Preview request: ${req.method} ${req.url}`);
       next();
     });
     
-    // Route to manually serve files from the dist directory
-    this.app.get('/preview/:id/*', (req, res) => {
+    // Improved static file middleware for previews
+    this.app.use('/preview/:id', (req, res, next) => {
       const siteId = req.params.id;
       const siteDir = path.join(PREVIEW_DIR, siteId);
       const distDir = path.join(siteDir, 'dist');
       
-      // The part of the URL after /preview/:id/
-      // Handle wildcard route param - using req.path instead to avoid TypeScript errors
-      const pathAfterIdMatch = req.path.match(/^\/preview\/\d+\/(.*)$/);
-      const filePath = pathAfterIdMatch ? pathAfterIdMatch[1] : 'index.html';
-      const fullPath = path.join(distDir, filePath);
-      
-      console.log(`Manual preview request for site ${siteId}, file: ${filePath}`);
-      console.log(`Full path: ${fullPath}, exists: ${fs.existsSync(fullPath)}`);
-      
-      // Check if the file exists
-      if (fs.existsSync(fullPath)) {
-        // Determine MIME type based on extension
-        let contentType = 'text/plain';
-        const ext = path.extname(fullPath).toLowerCase();
-        
-        switch (ext) {
-          case '.html': contentType = 'text/html'; break;
-          case '.js': contentType = 'text/javascript'; break;
-          case '.css': contentType = 'text/css'; break;
-          case '.json': contentType = 'application/json'; break;
-          case '.png': contentType = 'image/png'; break;
-          case '.jpg': case '.jpeg': contentType = 'image/jpeg'; break;
-          case '.gif': contentType = 'image/gif'; break;
-          case '.svg': contentType = 'image/svg+xml'; break;
-        }
-        
-        // Set the content type
-        res.setHeader('Content-Type', contentType);
-        
-        // Send the file
-        console.log(`Serving file: ${fullPath} with content type: ${contentType}`);
-        return fs.createReadStream(fullPath).pipe(res);
-      } else {
-        // If the file doesn't exist but the dist directory does, try serving index.html
-        if (fs.existsSync(distDir) && !filePath.includes('.')) {
-          const indexPath = path.join(distDir, 'index.html');
-          if (fs.existsSync(indexPath)) {
-            console.log(`File not found, serving index.html instead: ${indexPath}`);
-            res.setHeader('Content-Type', 'text/html');
-            return fs.createReadStream(indexPath).pipe(res);
-          }
-        }
-        
-        // File not found
-        console.log(`File not found: ${fullPath}`);
-        return res.status(404).send('File not found');
-      }
-    });
-    
-    // Fallback route for the root of a preview site
-    this.app.get('/preview/:id', (req, res) => {
-      const siteId = req.params.id;
-      const siteDir = path.join(PREVIEW_DIR, siteId);
-      const distDir = path.join(siteDir, 'dist');
-      const indexPath = path.join(distDir, 'index.html');
-      
-      console.log(`Preview request for site ${siteId} root`);
-      console.log(`Checking index file: ${indexPath}, exists: ${fs.existsSync(indexPath)}`);
-      
-      // Check if the index file exists
-      if (fs.existsSync(indexPath)) {
-        console.log(`Serving index file: ${indexPath}`);
-        res.setHeader('Content-Type', 'text/html');
-        return fs.createReadStream(indexPath).pipe(res);
-      } else {
-        console.log(`Index file not found for site ${siteId}`);
+      // Check if the dist directory exists
+      if (!fs.existsSync(distDir)) {
+        console.log(`Dist directory not found for site ${siteId}`);
         return res.status(404).send('Site preview not available yet. Please build the site first.');
       }
+      
+      // Custom static file server
+      const serveStaticFile = (filePath: string) => {
+        console.log(`Serving static file: ${filePath}`);
+        
+        // Check if the file exists
+        if (fs.existsSync(filePath)) {
+          // Determine MIME type based on extension
+          let contentType = 'text/plain';
+          const ext = path.extname(filePath).toLowerCase();
+          
+          switch (ext) {
+            case '.html': contentType = 'text/html'; break;
+            case '.js': contentType = 'text/javascript'; break;
+            case '.css': contentType = 'text/css'; break;
+            case '.json': contentType = 'application/json'; break;
+            case '.png': contentType = 'image/png'; break;
+            case '.jpg': case '.jpeg': contentType = 'image/jpeg'; break;
+            case '.gif': contentType = 'image/gif'; break;
+            case '.svg': contentType = 'image/svg+xml'; break;
+            case '.woff': contentType = 'font/woff'; break;
+            case '.woff2': contentType = 'font/woff2'; break;
+            case '.ttf': contentType = 'font/ttf'; break;
+            case '.eot': contentType = 'application/vnd.ms-fontobject'; break;
+            case '.otf': contentType = 'font/otf'; break;
+            case '.ico': contentType = 'image/x-icon'; break;
+          }
+          
+          // Set the content type and cache headers
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+          
+          // Send the file
+          return fs.createReadStream(filePath).pipe(res);
+        }
+        
+        return false;
+      };
+      
+      // Root path handling (/preview/:id)
+      if (req.path === `/preview/${siteId}` || req.path === `/preview/${siteId}/`) {
+        const indexPath = path.join(distDir, 'index.html');
+        console.log(`Root preview request for site ${siteId}, checking index at ${indexPath}`);
+        
+        if (serveStaticFile(indexPath)) {
+          return;
+        }
+        
+        console.log(`Index file not found for site ${siteId}`);
+        return res.status(404).send('Site preview index file not found.');
+      }
+      
+      // Subpath handling (/preview/:id/*)
+      const urlPath = req.path.substring(`/preview/${siteId}`.length) || '/';
+      const normalizedPath = urlPath === '/' ? '/index.html' : urlPath;
+      const filePath = path.join(distDir, normalizedPath);
+      
+      console.log(`Subpath preview request for site ${siteId}, path: ${normalizedPath}`);
+      
+      // Try to serve the exact file
+      if (serveStaticFile(filePath)) {
+        return;
+      }
+      
+      // If it's likely a route path (no file extension), try serving index.html
+      if (!path.extname(filePath)) {
+        const indexPath = path.join(distDir, 'index.html');
+        console.log(`File not found, trying SPA fallback to index.html: ${indexPath}`);
+        
+        if (serveStaticFile(indexPath)) {
+          return;
+        }
+      }
+      
+      // File not found
+      console.log(`File not found: ${filePath}`);
+      return res.status(404).send('File not found');
     });
     
-    // Serve static files for each preview site - build files
-    this.app.use('/preview-build/:id', (req, res, next) => {
+    // Assets route for direct access to static files
+    this.app.use('/preview-assets/:id', (req, res, next) => {
       const siteId = req.params.id;
       const siteDir = path.join(PREVIEW_DIR, siteId);
+      const distDir = path.join(siteDir, 'dist');
       
-      console.log(`Preview build files request for site ${siteId}, path: ${req.path}`);
-      console.log(`Serving static files from ${siteDir}`);
+      console.log(`Preview assets request for site ${siteId}, path: ${req.path}`);
       
-      express.static(siteDir)(req, res, next);
+      // Use express.static middleware for the dist directory
+      express.static(distDir, {
+        maxAge: '1h', // Cache for an hour
+        index: false, // Don't automatically serve index.html
+        etag: true,
+        lastModified: true
+      })(req, res, next);
     });
   }
   

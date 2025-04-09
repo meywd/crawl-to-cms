@@ -84,7 +84,7 @@ export interface SavedSite {
 }
 
 // Converted site status
-export type ConversionStatus = "in_progress" | "completed" | "failed";
+export type ConversionStatus = "started" | "processing" | "in_progress" | "completed" | "failed";
 
 // Converted site
 export interface ConvertedSite {
@@ -96,7 +96,8 @@ export interface ConvertedSite {
   pageCount: number;
   size: number;
   convertedAt: string;
-  status?: ConversionStatus;
+  status: ConversionStatus;
+  progressPercent?: number;
   reactVersion?: string;
   framework?: string;
   error?: string;
