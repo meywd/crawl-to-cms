@@ -1142,10 +1142,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const converter = new ReactConverter(storage);
         const zip = await converter.convertToReact(convertedSite.crawlId);
         
+        // Generate the binary zip file data
+        const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
+        
+        // Prepare a safe filename
+        const siteName = convertedSite.name || convertedSite.url || 'react-app';
+        const cleanSiteName = siteName.replace(/^https?:\/\//, '');
+        const safeFilename = cleanSiteName.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '_react_app.zip';
+        
         // Send the React application as a zip file
         res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', `attachment; filename=${convertedSite.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_react_app.zip`);
-        res.send(zip);
+        res.setHeader('Content-Disposition', `attachment; filename=${safeFilename}`);
+        res.send(zipContent);
         return;
       }
       
