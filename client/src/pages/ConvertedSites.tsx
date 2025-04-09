@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistance } from 'date-fns';
-import { Download, Trash2, Coffee, Loader2, AlertTriangle, Search } from 'lucide-react';
+import { Download, Trash2, Coffee, Loader2, AlertTriangle, Search, ExternalLink, Play } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -202,31 +202,48 @@ const ConvertedSites: React.FC = () => {
               <CardFooter className="flex justify-between gap-2">
                 {site.status === 'completed' ? (
                   <>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => setLocation(`/preview-converted/${site.id}`)}
-                    >
-                      <Search className="w-4 h-4 mr-2" />
-                      Preview
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => handleDownload(site)}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={() => handleDelete(site.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex flex-col gap-2 w-full">
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => setLocation(`/preview-converted/${site.id}`)}
+                        >
+                          <Search className="w-4 h-4 mr-2" />
+                          Code
+                        </Button>
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => setLocation(`/live-preview/${site.id}`)}
+                        >
+                          <Play className="w-4 h-4 mr-2" />
+                          Live Preview
+                        </Button>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => handleDownload(site)}
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleDelete(site.id)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
                   </>
                 ) : site.status === 'in_progress' ? (
                   <Button 

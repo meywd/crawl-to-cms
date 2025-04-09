@@ -135,3 +135,19 @@ export async function getConvertedSiteFileContent(id: string, path: string): Pro
   const response = await apiRequest("GET", `/api/sites/preview/${id}/file?path=${encodeURIComponent(path)}`, undefined);
   return response.json();
 }
+
+// Live Preview API functions
+export async function extractSiteForPreview(id: string): Promise<any> {
+  const response = await apiRequest("POST", `/api/sites/live-preview/${id}/extract`, undefined);
+  return response.json();
+}
+
+export async function buildSiteForPreview(id: string): Promise<any> {
+  const response = await apiRequest("POST", `/api/sites/live-preview/${id}/build`, undefined);
+  return response.json();
+}
+
+export async function getPreviewStatus(id: string): Promise<any> {
+  const response = await apiRequest("GET", `/api/sites/live-preview/${id}/status`, undefined);
+  return response.json();
+}

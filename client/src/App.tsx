@@ -11,6 +11,7 @@ import SavedSites from "@/pages/SavedSites";
 import ConvertedSites from "@/pages/ConvertedSites";
 import Preview from "@/pages/Preview";
 import ConvertedSitePreview from "@/pages/ConvertedSitePreview";
+import ConvertedSiteLivePreview from "@/pages/ConvertedSiteLivePreview";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Header from "@/components/Header";
@@ -44,6 +45,11 @@ function Router() {
           <ConvertedSitePreview />
         </PrivateRoute>
       </Route>
+      <Route path="/live-preview/:id">
+        <PrivateRoute>
+          <ConvertedSiteLivePreview />
+        </PrivateRoute>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -54,7 +60,7 @@ function App() {
   
   // Show navigation tabs only on main pages, not on login, register, preview or 404
   const showNavigation = location === '/' || location === '/history' || location === '/saved-sites' || location === '/converted-sites';
-  const isPreviewPage = location.startsWith('/preview/') || location.startsWith('/preview-converted/');
+  const isPreviewPage = location.startsWith('/preview/') || location.startsWith('/preview-converted/') || location.startsWith('/live-preview/');
   
   return (
     <QueryClientProvider client={queryClient}>

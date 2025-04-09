@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { WebCrawler } from "./crawler";
 import { ReactConverter } from "./react-converter";
+import { getPreviewServer } from "./preview-server";
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
@@ -1933,6 +1934,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
       createdAt: user.createdAt || new Date().toISOString(),
       lastLogin: user.lastLogin
     });
+  });
+
+  // Live Preview Routes
+  
+  // Initialize the preview server
+  const previewServer = getPreviewServer(storage);
+  
+  // Mount the preview server middleware
+  app.use(previewServer.getApp());
+  
+  // Extract a site for preview
+  app.post("/api/sites/live-preview/:id/extract", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid site ID" });
+      }
+      
+      const convertedSite = await storage.getConvertedSite(id);
+      if (!convertedSite) {
+        return res.status(404).json({ message: "Converted site not found" });
+      }
+      
+      // Verify the site belongs to the authenticated user
+      if (convertedSite.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to preview this site" });
+      }
+      
+      // Extract the site
+      const siteDir = await previewServer.extractSite(id);
+      
+      return res.status(200).json({
+        message: "Site extracted successfully",
+        siteId: id.toString(),
+        path: siteDir
+      });
+    } catch (error) {
+      console.error("Error extracting site for preview:", error);
+      return res.status(500).json({ message: `Internal server error: ${error instanceof Error ? error.message : String(error)}` });
+    }
+  });
+  
+  // Build a site for preview
+  app.post("/api/sites/live-preview/:id/build", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid site ID" });
+      }
+      
+      const convertedSite = await storage.getConvertedSite(id);
+      if (!convertedSite) {
+        return res.status(404).json({ message: "Converted site not found" });
+      }
+      
+      // Verify the site belongs to the authenticated user
+      if (convertedSite.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to preview this site" });
+      }
+      
+      // Start the build process (this runs asynchronously)
+      previewServer.buildSite(id.toString()).catch(err => {
+        console.error(`Error building site ${id}:`, err);
+      });
+      
+      return res.status(200).json({
+        message: "Build started",
+        siteId: id.toString(),
+        status: "building"
+      });
+    } catch (error) {
+      console.error("Error building site for preview:", error);
+      return res.status(500).json({ message: `Internal server error: ${error instanceof Error ? error.message : String(error)}` });
+    }
+  });
+  
+  // Get build status
+  app.get("/api/sites/live-preview/:id/status", isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      // Get user ID from the request
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid site ID" });
+      }
+      
+      const convertedSite = await storage.getConvertedSite(id);
+      if (!convertedSite) {
+        return res.status(404).json({ message: "Converted site not found" });
+      }
+      
+      // Verify the site belongs to the authenticated user
+      if (convertedSite.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to preview this site" });
+      }
+      
+      // Get the build status
+      const status = previewServer.getBuildStatus(id.toString());
+      
+      // Get the preview URL if the build is complete
+      const previewUrl = previewServer.getPreviewUrl(id.toString(), req);
+      
+      return res.status(200).json({
+        siteId: id.toString(),
+        status,
+        previewUrl
+      });
+    } catch (error) {
+      console.error("Error getting build status:", error);
+      return res.status(500).json({ message: `Internal server error: ${error instanceof Error ? error.message : String(error)}` });
+    }
   });
 
   const httpServer = createServer(app);
