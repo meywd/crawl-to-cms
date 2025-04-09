@@ -1024,15 +1024,57 @@ This project is provided as-is, with no warranties or guarantees.
    * Generate the Prisma seed file to populate initial data
    */
   private generatePrismaSeed(pages: Page[]): string {
-    // Extract page titles for initial data
-    const pageEntries = pages.map((page, index) => {
+    // Process pages to extract content and detect language
+    const processedPages = pages.map((page, index) => {
+      const $ = cheerio.load(page.content);
       const title = this.extractTitle(page.content) || `Page ${index + 1}`;
-      const slug = page.path.replace('.html', '').replace(/^\//, '');
-      return { title, slug: slug || 'home' };
+      const slug = page.path.replace('.html', '').replace(/^\//, '') || 'home';
+      
+      // Extract page content
+      const bodyText = $('body').text().trim();
+      const bodyHtml = $('body').html() || '';
+      
+      // Extract main content sections
+      const mainContent = this.extractMainContent($);
+      
+      // Remove scripts and styles for text analysis
+      $('script, style').remove();
+      const cleanText = $.text().trim();
+      
+      // Use franc to detect the language (will return ISO 639-3 codes)
+      const detectedLang = cleanText.length > 10 ? 
+        require('franc')(cleanText) : 'eng';
+      
+      // Map from ISO 639-3 to our language codes
+      const langMap = {
+        'eng': 'en',
+        'spa': 'es',
+        'und': 'en' // Default to English when uncertain
+      };
+      
+      // Use detected language or default to English
+      const primaryLang = langMap[detectedLang] || 'en';
+      // Secondary language will be the other supported language
+      const secondaryLang = primaryLang === 'en' ? 'es' : 'en';
+      
+      // Extract meta description
+      const metaDescription = $('meta[name="description"]').attr('content') || 
+                              $('meta[property="og:description"]').attr('content') || 
+                              '';
+      
+      return {
+        title,
+        slug,
+        primaryLang,
+        secondaryLang,
+        metaDescription,
+        mainContent,
+        bodyHtml
+      };
     });
     
     // Create JSON with page entries
-    const pagesJson = JSON.stringify(pageEntries, null, 2).replace(/^/gm, '  ');
+    const pagesJson = JSON.stringify(processedPages, null, 2).replace(/^/gm, '  ');
     
     return `import { PrismaClient } from '@prisma/client';
 
@@ -1076,59 +1118,89 @@ async function main() {
       },
     });
 
-    // Create English content
+    // Get the language IDs
+    const primaryLangId = page.primaryLang === 'en' ? english.id : spanish.id;
+    const secondaryLangId = page.secondaryLang === 'en' ? english.id : spanish.id;
+    
+    // Primary language content (original language)
     await prisma.pageContent.create({
       data: {
         pageId: newPage.id,
-        languageId: english.id,
+        languageId: primaryLangId,
         title: page.title,
-        description: 'Default page description',
+        description: page.metaDescription || 'Page description',
         metaTitle: page.title,
-        metaDescription: 'Default meta description',
+        metaDescription: page.metaDescription || 'Page description',
       },
     });
 
-    // Create Spanish content (placeholder)
+    // Secondary language content (placeholder translation)
+    const secondaryTitle = page.secondaryLang === 'es' ? 
+      \`\${page.title} (ES)\` : page.title;
+    const secondaryDesc = page.secondaryLang === 'es' ? 
+      'Descripción de la página' : 'Page description';
+    
     await prisma.pageContent.create({
       data: {
         pageId: newPage.id,
-        languageId: spanish.id,
-        title: \`\${page.title} (ES)\`,
-        description: 'Descripción predeterminada de la página',
-        metaTitle: \`\${page.title} (ES)\`,
-        metaDescription: 'Descripción meta predeterminada',
+        languageId: secondaryLangId,
+        title: secondaryTitle,
+        description: secondaryDesc,
+        metaTitle: secondaryTitle,
+        metaDescription: secondaryDesc,
       },
     });
 
-    // Create default section
+    // Create content sections from the main content in primary language
+    if (page.mainContent && page.mainContent.length > 0) {
+      // Add each content section
+      for (let i = 0; i < page.mainContent.length; i++) {
+        const section = page.mainContent[i];
+        await prisma.section.create({
+          data: {
+            pageId: newPage.id,
+            languageId: primaryLangId,
+            type: section.type || 'content',
+            order: i + 1,
+            title: section.title || \`Section \${i + 1}\`,
+            content: section.content,
+            imageUrl: section.imageUrl,
+          },
+        });
+      }
+    } else {
+      // Fallback if no sections were extracted
+      await prisma.section.create({
+        data: {
+          pageId: newPage.id,
+          languageId: primaryLangId,
+          type: 'content',
+          order: 1,
+          title: 'Main Content',
+          content: page.bodyHtml || '<p>Content from the original page</p>',
+        },
+      });
+    }
+
+    // Create placeholder section in secondary language
     await prisma.section.create({
       data: {
         pageId: newPage.id,
-        languageId: english.id,
+        languageId: secondaryLangId,
         type: 'content',
         order: 1,
-        title: 'Main Content',
-        content: '<p>This is the default content for this page.</p>',
+        title: page.secondaryLang === 'es' ? 'Contenido Principal' : 'Main Content',
+        content: page.secondaryLang === 'es' ? 
+          '<p>Este contenido requiere traducción.</p>' : 
+          '<p>This content needs translation.</p>',
       },
     });
 
-    // Create Spanish section
-    await prisma.section.create({
-      data: {
-        pageId: newPage.id,
-        languageId: spanish.id,
-        type: 'content',
-        order: 1,
-        title: 'Contenido Principal',
-        content: '<p>Este es el contenido predeterminado para esta página.</p>',
-      },
-    });
-
-    // Create menu item
+    // Create menu items
     await prisma.menuItem.create({
       data: {
         languageId: english.id,
-        title: page.title,
+        title: page.primaryLang === 'en' ? page.title : secondaryTitle,
         slug: page.slug,
         order: newPage.id,
         pageId: newPage.id,
@@ -1136,11 +1208,10 @@ async function main() {
       },
     });
 
-    // Create Spanish menu item
     await prisma.menuItem.create({
       data: {
         languageId: spanish.id,
-        title: \`\${page.title} (ES)\`,
+        title: page.primaryLang === 'es' ? page.title : \`\${page.title} (ES)\`,
         slug: page.slug,
         order: newPage.id,
         pageId: newPage.id,
@@ -1176,6 +1247,115 @@ main()
     await prisma.$disconnect();
   });
 `;
+  }
+  
+  /**
+   * Extract main content sections from a page
+   */
+  private extractMainContent($: CheerioStatic): Array<{type: string, title?: string, content: string, imageUrl?: string}> {
+    const sections = [];
+    
+    // Try to identify main content area
+    const mainContentSelectors = [
+      'main', 
+      '#main', 
+      '#content', 
+      '.content', 
+      'article', 
+      '.main-content',
+      '[role="main"]'
+    ];
+    
+    let mainContent = $('body');
+    for (const selector of mainContentSelectors) {
+      if ($(selector).length) {
+        mainContent = $(selector);
+        break;
+      }
+    }
+    
+    // Extract heading sections
+    mainContent.find('h1, h2, h3').each((i, el) => {
+      const heading = $(el);
+      const title = heading.text().trim();
+      
+      if (!title) return;
+      
+      // Get content until next heading
+      let content = '';
+      let sectionContent = heading.nextUntil('h1, h2, h3');
+      
+      if (sectionContent.length) {
+        // Wrap the content elements in a div to get their HTML
+        const tempContainer = $('<div></div>');
+        sectionContent.each((i, el) => {
+          tempContainer.append($(el).clone());
+        });
+        content = tempContainer.html() || '';
+      }
+      
+      if (content) {
+        sections.push({
+          type: 'content',
+          title,
+          content
+        });
+      }
+    });
+    
+    // If no sections found using headings, look for other typical section indicators
+    if (sections.length === 0) {
+      // Look for common section containers
+      mainContent.find('section, .section, .card, .box, .panel, .container, .row > div').each((i, el) => {
+        const section = $(el);
+        let title = '';
+        
+        // Try to find a heading inside the section
+        const heading = section.find('h1, h2, h3, h4, h5, h6').first();
+        if (heading.length) {
+          title = heading.text().trim();
+        }
+        
+        const content = section.html() || '';
+        
+        // Check if section has an image
+        const img = section.find('img').first();
+        const imageUrl = img.length ? img.attr('src') : undefined;
+        
+        if (content) {
+          let type = 'content';
+          
+          // Try to identify section type based on classes or content
+          if (section.hasClass('hero') || section.hasClass('banner') || 
+              section.hasClass('jumbotron') || section.hasClass('header')) {
+            type = 'hero';
+          } else if (imageUrl && content.length < 500) {
+            type = 'feature';
+          } else if (section.find('form').length > 0) {
+            type = 'form';
+          }
+          
+          sections.push({
+            type,
+            title,
+            content,
+            imageUrl
+          });
+        }
+      });
+    }
+    
+    // If still no sections, create a single section with all content
+    if (sections.length === 0) {
+      sections.push({
+        type: 'content',
+        title: 'Page Content',
+        content: mainContent.html() || '<p>No content found</p>'
+      });
+    }
+    
+    return sections;
+  }
   }
   
   /**
