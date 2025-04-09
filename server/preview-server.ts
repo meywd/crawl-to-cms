@@ -42,15 +42,84 @@ export class PreviewServer {
    * Setup Express routes for the preview server
    */
   private setupRoutes() {
-    // Serve static files for each preview site
-    this.app.use('/preview/:id', (req, res, next) => {
+    // Debug middleware to log all preview requests
+    this.app.use('/preview', (req, res, next) => {
+      console.log(`Preview request: ${req.url}`);
+      next();
+    });
+    
+    // Route to manually serve files from the dist directory
+    this.app.get('/preview/:id/*', (req, res) => {
       const siteId = req.params.id;
       const siteDir = path.join(PREVIEW_DIR, siteId);
+      const distDir = path.join(siteDir, 'dist');
       
-      // Check if site build is available
-      if (fs.existsSync(path.join(siteDir, 'dist'))) {
-        return express.static(path.join(siteDir, 'dist'))(req, res, next);
+      // The part of the URL after /preview/:id/
+      // Handle wildcard route param - using req.path instead to avoid TypeScript errors
+      const pathAfterIdMatch = req.path.match(/^\/preview\/\d+\/(.*)$/);
+      const filePath = pathAfterIdMatch ? pathAfterIdMatch[1] : 'index.html';
+      const fullPath = path.join(distDir, filePath);
+      
+      console.log(`Manual preview request for site ${siteId}, file: ${filePath}`);
+      console.log(`Full path: ${fullPath}, exists: ${fs.existsSync(fullPath)}`);
+      
+      // Check if the file exists
+      if (fs.existsSync(fullPath)) {
+        // Determine MIME type based on extension
+        let contentType = 'text/plain';
+        const ext = path.extname(fullPath).toLowerCase();
+        
+        switch (ext) {
+          case '.html': contentType = 'text/html'; break;
+          case '.js': contentType = 'text/javascript'; break;
+          case '.css': contentType = 'text/css'; break;
+          case '.json': contentType = 'application/json'; break;
+          case '.png': contentType = 'image/png'; break;
+          case '.jpg': case '.jpeg': contentType = 'image/jpeg'; break;
+          case '.gif': contentType = 'image/gif'; break;
+          case '.svg': contentType = 'image/svg+xml'; break;
+        }
+        
+        // Set the content type
+        res.setHeader('Content-Type', contentType);
+        
+        // Send the file
+        console.log(`Serving file: ${fullPath} with content type: ${contentType}`);
+        return fs.createReadStream(fullPath).pipe(res);
       } else {
+        // If the file doesn't exist but the dist directory does, try serving index.html
+        if (fs.existsSync(distDir) && !filePath.includes('.')) {
+          const indexPath = path.join(distDir, 'index.html');
+          if (fs.existsSync(indexPath)) {
+            console.log(`File not found, serving index.html instead: ${indexPath}`);
+            res.setHeader('Content-Type', 'text/html');
+            return fs.createReadStream(indexPath).pipe(res);
+          }
+        }
+        
+        // File not found
+        console.log(`File not found: ${fullPath}`);
+        return res.status(404).send('File not found');
+      }
+    });
+    
+    // Fallback route for the root of a preview site
+    this.app.get('/preview/:id', (req, res) => {
+      const siteId = req.params.id;
+      const siteDir = path.join(PREVIEW_DIR, siteId);
+      const distDir = path.join(siteDir, 'dist');
+      const indexPath = path.join(distDir, 'index.html');
+      
+      console.log(`Preview request for site ${siteId} root`);
+      console.log(`Checking index file: ${indexPath}, exists: ${fs.existsSync(indexPath)}`);
+      
+      // Check if the index file exists
+      if (fs.existsSync(indexPath)) {
+        console.log(`Serving index file: ${indexPath}`);
+        res.setHeader('Content-Type', 'text/html');
+        return fs.createReadStream(indexPath).pipe(res);
+      } else {
+        console.log(`Index file not found for site ${siteId}`);
         return res.status(404).send('Site preview not available yet. Please build the site first.');
       }
     });
@@ -59,6 +128,9 @@ export class PreviewServer {
     this.app.use('/preview-build/:id', (req, res, next) => {
       const siteId = req.params.id;
       const siteDir = path.join(PREVIEW_DIR, siteId);
+      
+      console.log(`Preview build files request for site ${siteId}, path: ${req.path}`);
+      console.log(`Serving static files from ${siteDir}`);
       
       express.static(siteDir)(req, res, next);
     });
@@ -171,9 +243,28 @@ export class PreviewServer {
     if (build && build.status === 'complete') {
       // Use the host from the original request
       const host = req.headers.host || 'localhost:3000';
-      return `http://${host}/preview/${siteId}/index.html`;
+      const previewUrl = `http://${host}/preview/${siteId}`;
+      console.log(`Preview URL for site ${siteId}: ${previewUrl}`);
+      
+      // Check if the directory exists
+      const siteDir = path.join(PREVIEW_DIR, siteId);
+      const distDir = path.join(siteDir, 'dist');
+      console.log(`Checking if dist directory exists: ${distDir}, exists: ${fs.existsSync(distDir)}`);
+      
+      if (fs.existsSync(distDir)) {
+        const indexFile = path.join(distDir, 'index.html');
+        console.log(`Checking if index.html exists: ${indexFile}, exists: ${fs.existsSync(indexFile)}`);
+        
+        if (fs.existsSync(indexFile)) {
+          return previewUrl;
+        }
+      }
+      
+      console.log(`Dist directory or index.html not found for site ${siteId}`);
+      return null;
     }
     
+    console.log(`No preview URL available for site ${siteId}, build status: ${build?.status || 'no build'}`);
     return null;
   }
   
@@ -213,17 +304,56 @@ export class PreviewServer {
       console.log(`Building site ${siteId}...`);
       
       try {
-        await execAsync('npm run build', { cwd: siteDir, timeout: 300000 }); // 5 minute timeout
+        // Check if package.json has a build script
+        const packageJsonPath = path.join(siteDir, 'package.json');
+        if (fs.existsSync(packageJsonPath)) {
+          const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+          console.log(`Package.json scripts:`, packageJson.scripts);
+          
+          if (!packageJson.scripts || !packageJson.scripts.build) {
+            console.log(`Adding build script to package.json`);
+            if (!packageJson.scripts) {
+              packageJson.scripts = {};
+            }
+            packageJson.scripts.build = 'vite build';
+            fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+          }
+        } else {
+          console.error(`Package.json not found at ${packageJsonPath}`);
+        }
+        
+        // Run build
+        const { stdout, stderr } = await execAsync('npm run build', { cwd: siteDir, timeout: 300000 }); // 5 minute timeout
+        console.log(`Build output for site ${siteId}:`);
+        console.log(`stdout: ${stdout}`);
+        console.log(`stderr: ${stderr}`);
       } catch (error: any) {
         console.error(`Error building site ${siteId}:`, error);
+        console.log(`Build command stderr: ${error.stderr}`);
+        console.log(`Build command stdout: ${error.stdout}`);
         this.activeBuilds.set(siteId, { process: null, status: 'failed', port: undefined });
         throw new Error(`Failed to build site: ${error.message}`);
       }
       
       // Check if the build was successful
-      if (!fs.existsSync(path.join(siteDir, 'dist'))) {
+      const distDir = path.join(siteDir, 'dist');
+      if (!fs.existsSync(distDir)) {
+        console.error(`Dist directory not found at ${distDir} after build`);
+        // List files in the site directory
+        console.log(`Files in site directory for ${siteId}:`);
+        fs.readdirSync(siteDir).forEach(file => {
+          console.log(`- ${file}`);
+        });
+        
         this.activeBuilds.set(siteId, { process: null, status: 'failed', port: undefined });
         throw new Error('Build completed but no dist directory was created');
+      } else {
+        console.log(`Dist directory created for site ${siteId}`);
+        // List files in the dist directory
+        console.log(`Files in dist directory for ${siteId}:`);
+        fs.readdirSync(distDir).forEach(file => {
+          console.log(`- ${file}`);
+        });
       }
       
       // Mark as complete
