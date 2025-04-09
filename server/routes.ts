@@ -1120,13 +1120,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid crawl ID" });
+        return res.status(400).json({ message: "Invalid ID" });
       }
 
       // Check if we're filtering by asset type
       const assetType = req.query.type as string | undefined;
       
-      // Check if this is a saved site ID first
+      // Check if this is a converted site ID first
+      const convertedSite = await storage.getConvertedSite(id);
+      
+      // If this is a converted site, download the React application
+      if (convertedSite) {
+        // Verify the converted site belongs to the authenticated user
+        if (convertedSite.userId !== userId) {
+          return res.status(403).json({ message: "You don't have permission to download this converted site" });
+        }
+        
+        console.log(`Downloading converted site ${id} (React application)`);
+        
+        // Use the React converter to generate or fetch the React application
+        const converter = new ReactConverter(storage);
+        const zip = await converter.convertToReact(convertedSite.crawlId);
+        
+        // Send the React application as a zip file
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename=${convertedSite.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_react_app.zip`);
+        res.send(zip);
+        return;
+      }
+      
+      // If not a converted site, check if it's a saved site
       const savedSite = await storage.getSavedSite(id);
       let crawl;
       let crawlId;
@@ -1151,7 +1174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         crawl = await storage.getCrawl(id);
         
         if (!crawl) {
-          return res.status(404).json({ message: "Crawl or saved site not found" });
+          return res.status(404).json({ message: "Crawl, saved site, or converted site not found" });
         }
         
         // Verify the crawl belongs to the authenticated user
