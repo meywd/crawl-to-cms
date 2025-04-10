@@ -258,23 +258,10 @@ const ConvertedSites: React.FC = () => {
     });
   };
 
-  // Delete site mutation
+  // Delete site mutation - only define the mutation function without success/error handlers
+  // (we'll handle success/error in the mutation call itself for more context)
   const deleteMutation = useMutation({
-    mutationFn: deleteConvertedSite,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/sites/converted'] });
-      toast({
-        title: "Site deleted",
-        description: "The converted site has been deleted.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Could not delete the site.",
-      });
-    }
+    mutationFn: deleteConvertedSite
   });
 
   // Handle download site
@@ -286,18 +273,43 @@ const ConvertedSites: React.FC = () => {
     });
   };
 
-  // Handle delete site
+  // Handle delete site with improved error handling and user feedback
   const handleDelete = (id: string) => {
     if (window.confirm("Are you sure you want to delete this converted site?")) {
       try {
-        console.log("Deleting site ID:", id);
-        deleteMutation.mutate(id);
+        console.log(`Initiating deletion of converted site with ID: ${id}`);
+        
+        // Show pending toast
+        toast({
+          title: "Deleting site...",
+          description: "Please wait while we delete this site.",
+        });
+        
+        // Attempt to delete the site
+        deleteMutation.mutate(id, {
+          onSuccess: () => {
+            console.log(`Successfully deleted converted site with ID: ${id}`);
+            queryClient.invalidateQueries({ queryKey: ['/api/sites/converted'] });
+            toast({
+              title: "Success",
+              description: "The converted site has been deleted successfully.",
+            });
+          },
+          onError: (error: any) => {
+            console.error(`Error deleting converted site with ID ${id}:`, error);
+            toast({
+              variant: "destructive",
+              title: "Deletion Failed",
+              description: error.message || "Could not delete the site. Please try again.",
+            });
+          }
+        });
       } catch (err) {
-        console.error("Error in handleDelete:", err);
+        console.error(`Error in handleDelete for site ID ${id}:`, err);
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Failed to delete site. Please try again.",
+          description: "An unexpected error occurred. Please try again later.",
         });
       }
     }
