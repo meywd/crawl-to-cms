@@ -2074,15 +2074,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You don't have permission to preview this site" });
       }
       
-      // Get the build status
-      const status = previewServer.getBuildStatus(id.toString());
+      // Get the build status (now includes error information)
+      const buildStatus = previewServer.getBuildStatus(id.toString());
       
       // Get the preview URL if the build is complete
       const previewUrl = previewServer.getPreviewUrl(id.toString(), req);
       
       return res.status(200).json({
         siteId: id.toString(),
-        status,
+        status: buildStatus.status,
+        error: buildStatus.error, // Include the error message from the build process
         previewUrl
       });
     } catch (error) {

@@ -13,6 +13,7 @@ interface PreviewStatus {
   siteId: string;
   status: 'not_started' | 'building' | 'complete' | 'failed';
   previewUrl: string | null;
+  error?: string; // Error message when build fails
 }
 
 const ConvertedSiteLivePreview: React.FC = () => {
@@ -196,9 +197,15 @@ const ConvertedSiteLivePreview: React.FC = () => {
           ) : status?.status === 'failed' ? (
             <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-md text-red-800">
               <p className="font-medium">Build failed</p>
-              <p className="text-sm mt-1">
-                There was an error building the preview. Please try again or check the logs.
-              </p>
+              {status?.error ? (
+                <div className="text-sm mt-1 p-2 bg-red-100 rounded border border-red-200 overflow-auto max-h-32 text-red-900">
+                  <code className="whitespace-pre-wrap break-words">{status.error}</code>
+                </div>
+              ) : (
+                <p className="text-sm mt-1">
+                  There was an error building the preview. Please try again or check the logs.
+                </p>
+              )}
               <Button 
                 variant="outline" 
                 size="sm" 

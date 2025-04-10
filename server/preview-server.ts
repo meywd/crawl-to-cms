@@ -400,13 +400,13 @@ export class PreviewServer {
             fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
             console.log(`Updated package.json:`, JSON.stringify(packageJson, null, 2));
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error(`Error parsing or updating package.json:`, error);
           this.activeBuilds.set(siteId, { 
             process: null, 
             status: 'failed', 
             port: undefined,
-            error: `Error parsing package.json: ${error.message}` 
+            error: `Error parsing package.json: ${error.message || 'Unknown error'}` 
           });
           return;
         }
@@ -487,7 +487,7 @@ export class PreviewServer {
       this.activeBuilds.set(siteId, { process: null, status: 'complete', port: undefined });
       
       console.log(`Site ${siteId} built successfully`);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error building site ${siteId}:`, error);
       this.activeBuilds.set(siteId, { 
         process: null, 
