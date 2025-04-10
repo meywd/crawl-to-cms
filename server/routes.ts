@@ -1976,6 +1976,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       lastLogin: user.lastLogin
     });
   });
+  
+  // Debug route for authentication debugging
+  app.get('/api/auth/debug', (req: Request, res: Response) => {
+    // Print out details about the session
+    console.log("Session:", req.session);
+    console.log("isAuthenticated:", req.isAuthenticated());
+    console.log("req.user:", req.user);
+    
+    return res.status(200).json({
+      isAuthenticated: req.isAuthenticated(),
+      session: req.session,
+      user: req.user,
+      sessionID: req.sessionID,
+      cookies: req.cookies
+    });
+  });
 
   // Live Preview Routes
   
