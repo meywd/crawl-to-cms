@@ -1591,8 +1591,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
+      console.log(`Fetching converted sites for user ID: ${userId}`);
+      
+      // Debug authentication data
+      console.log(`User info in request:`, req.user);
+      console.log(`Is authenticated: ${req.isAuthenticated()}`);
+
       // Get all converted sites for this user
       const convertedSites = await storage.getConvertedSites(userId);
+      console.log(`Found ${convertedSites.length} converted sites for user ${userId}`);
+      
+      // Debug first site if available
+      if (convertedSites.length > 0) {
+        console.log(`First site: userId=${convertedSites[0].userId}, id=${convertedSites[0].id}`);
+      }
+      
       return res.status(200).json(convertedSites);
     } catch (error) {
       console.error("Error fetching converted sites:", error);
