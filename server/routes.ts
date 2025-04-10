@@ -1619,34 +1619,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete Converted Site Route
   app.delete("/api/sites/converted/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      console.log(`Received delete request for converted site ID: ${req.params.id}`);
+      
       // Get user ID from the request
       const userId = getUserId(req);
       if (!userId) {
+        console.log("Delete failed: User not authenticated");
         return res.status(401).json({ message: "Unauthorized" });
       }
       
+      console.log(`Authenticated user ID for delete operation: ${userId}`);
+      
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
+        console.log(`Delete failed: Invalid ID ${req.params.id}`);
         return res.status(400).json({ message: "Invalid ID" });
       }
       
       // Check if the converted site exists and belongs to the user
       const convertedSite = await storage.getConvertedSite(id);
       if (!convertedSite) {
+        console.log(`Delete failed: Converted site with ID ${id} not found`);
         return res.status(404).json({ message: "Converted site not found" });
       }
       
+      console.log(`Found site to delete: ID=${convertedSite.id}, userID=${convertedSite.userId}`);
+      
       if (convertedSite.userId !== userId) {
+        console.log(`Delete failed: Site userID=${convertedSite.userId} doesn't match authenticated userID=${userId}`);
         return res.status(403).json({ message: "You don't have permission to delete this converted site" });
       }
       
       // Delete the converted site
-      await storage.deleteConvertedSite(id);
+      console.log(`Deleting converted site ID: ${id} for user ${userId}`);
+      const result = await storage.deleteConvertedSite(id);
+      console.log(`Delete result: ${result}`);
       
-      return res.status(204).end();
+      console.log(`Successfully deleted converted site ID: ${id}`);
+      return res.status(200).json({ success: true, message: "Converted site deleted successfully" });
     } catch (error) {
       console.error("Error deleting converted site:", error);
       return res.status(500).json({ 
+        success: false,
         message: "Error deleting converted site", 
         error: error instanceof Error ? error.message : "Unknown error" 
       });

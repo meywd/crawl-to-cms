@@ -436,10 +436,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteConvertedSite(id: number): Promise<boolean> {
-    const result = await db
-      .delete(convertedSites)
-      .where(eq(convertedSites.id, id));
-    return true; // Always return true as we've executed the delete operation
+    try {
+      console.log(`Attempting to delete converted site with ID: ${id}`);
+      const result = await db
+        .delete(convertedSites)
+        .where(eq(convertedSites.id, id))
+        .returning({ deleted: convertedSites.id });
+      
+      const deletedCount = result.length;
+      console.log(`Deleted ${deletedCount} converted site records with ID ${id}`);
+      
+      return deletedCount > 0;
+    } catch (error) {
+      console.error(`Error deleting converted site with ID ${id}:`, error);
+      throw error;
+    }
   }
 }
 
