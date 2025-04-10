@@ -52,12 +52,28 @@ export default function HistoryPage() {
     setLocation(`/preview/${id}`);
   };
 
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/crawl/history'] });
+  };
+
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden">
       <div className="border-b border-gray-200">
-        <div className="flex py-4 px-6">
-          <History className="h-5 w-5 mr-2 text-primary" />
-          <h1 className="text-lg font-medium">Crawl History</h1>
+        <div className="flex justify-between items-center py-4 px-6">
+          <div className="flex items-center">
+            <History className="h-5 w-5 mr-2 text-primary" />
+            <h1 className="text-lg font-medium">Crawl History</h1>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={isLoading || isRefetching}
+            className="text-gray-500 hover:text-primary"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
+            <span className="ml-1">Refresh</span>
+          </Button>
         </div>
       </div>
 
@@ -71,7 +87,10 @@ export default function HistoryPage() {
         ) : history && history.length > 0 ? (
           <div className="grid gap-4">
             {history.map((item: any) => (
-              <Card key={item.id} className="overflow-hidden">
+              <Card 
+                key={item.id} 
+                className={`overflow-hidden ${isDeleting === item.id ? 'opacity-70' : ''}`}
+              >
                 <CardHeader className="bg-gray-50 py-3 px-4">
                   <CardTitle className="text-base font-medium flex items-center">
                     <Globe className="h-4 w-4 mr-2 text-primary" />
@@ -89,6 +108,7 @@ export default function HistoryPage() {
                         variant="outline" 
                         size="sm"
                         onClick={() => handleViewSite(item.id)}
+                        disabled={isDeleting === item.id}
                       >
                         <ExternalLink className="h-4 w-4 mr-1" />
                         View
@@ -98,9 +118,19 @@ export default function HistoryPage() {
                         size="sm"
                         className="text-red-500 hover:text-red-600"
                         onClick={() => handleDeleteCrawl(item.id)}
+                        disabled={isDeleting !== null}
                       >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
+                        {isDeleting === item.id ? (
+                          <>
+                            <div className="h-4 w-4 mr-1 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
