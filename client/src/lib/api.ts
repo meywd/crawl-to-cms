@@ -118,7 +118,15 @@ export async function getConvertedSites(): Promise<ConvertedSite[]> {
 }
 
 export async function deleteConvertedSite(id: string): Promise<void> {
-  await apiRequest("DELETE", `/api/sites/converted/${id}`, undefined);
+  try {
+    console.log(`Deleting converted site with ID: ${id}`);
+    const response = await apiRequest("DELETE", `/api/sites/converted/${id}`, undefined);
+    console.log(`Delete response status: ${response.status}`);
+    return;
+  } catch (error) {
+    console.error(`Error deleting converted site with ID ${id}:`, error);
+    throw error;
+  }
 }
 
 export async function downloadConvertedSite(id: string): Promise<void> {

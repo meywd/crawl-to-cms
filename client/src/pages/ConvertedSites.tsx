@@ -289,7 +289,17 @@ const ConvertedSites: React.FC = () => {
   // Handle delete site
   const handleDelete = (id: string) => {
     if (window.confirm("Are you sure you want to delete this converted site?")) {
-      deleteMutation.mutate(id);
+      try {
+        console.log("Deleting site ID:", id);
+        deleteMutation.mutate(id);
+      } catch (err) {
+        console.error("Error in handleDelete:", err);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to delete site. Please try again.",
+        });
+      }
     }
   };
   
