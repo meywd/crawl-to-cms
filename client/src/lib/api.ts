@@ -67,6 +67,48 @@ export async function getCrawlHistory(): Promise<Crawl[]> {
   return response.json();
 }
 
+export async function deleteCrawlHistory(id: string): Promise<void> {
+  try {
+    console.log(`[API] Deleting crawl history with ID: ${id}`);
+    
+    // Check authentication before making request
+    const currentUser = await getCurrentUser();
+    console.log(`[API] Current authenticated user:`, currentUser);
+    
+    if (!currentUser) {
+      console.error(`[API] User is not authenticated for delete operation`);
+      throw new Error("You must be logged in to delete a crawl");
+    }
+    
+    const response = await apiRequest("DELETE", `/api/crawl/history/${id}`, undefined);
+    console.log(`[API] Delete crawl response:`, {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+    
+    if (response.ok) {
+      console.log(`[API] Successfully deleted crawl with ID: ${id}`);
+      return;
+    } else {
+      // Try to get the error details
+      let errorDetails = "Unknown error";
+      try {
+        const errorJson = await response.json();
+        errorDetails = errorJson.message || errorJson.error || JSON.stringify(errorJson);
+      } catch (parseError) {
+        errorDetails = response.statusText;
+      }
+      
+      console.error(`[API] Server returned error status ${response.status}: ${errorDetails}`);
+      throw new Error(`Failed to delete crawl: ${errorDetails}`);
+    }
+  } catch (error) {
+    console.error(`[API] Error deleting crawl with ID ${id}:`, error);
+    throw error;
+  }
+}
+
 // Pages API functions
 export async function getPageContent(crawlId: string, path: string): Promise<Page> {
   const response = await apiRequest("GET", `/api/pages/${crawlId}/${path}`, undefined);

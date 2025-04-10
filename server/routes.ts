@@ -321,38 +321,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Route to delete crawl history
+  // Route to delete crawl history with enhanced error handling
   app.delete("/api/crawl/history/:id", isAuthenticated, async (req: Request, res: Response) => {
     try {
+      console.log(`Received request to delete crawl history with ID: ${req.params.id}`);
+      
       // Get user ID from the request
       const userId = getUserId(req);
       if (!userId) {
-        return res.status(401).json({ message: "Unauthorized" });
+        console.log(`Crawl delete failed: User not authenticated`);
+        return res.status(401).json({ 
+          success: false, 
+          message: "Unauthorized" 
+        });
       }
+      
+      console.log(`Authenticated user ID for crawl delete: ${userId}`);
     
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid crawl ID" });
+        console.log(`Crawl delete failed: Invalid crawl ID ${req.params.id}`);
+        return res.status(400).json({ 
+          success: false, 
+          message: "Invalid crawl ID" 
+        });
       }
 
+      console.log(`Looking up crawl with ID: ${id}`);
       // There's no explicit delete method in our storage interface,
       // so we'll just mark it as cancelled
       const crawl = await storage.getCrawl(id);
       
       if (!crawl) {
-        return res.status(404).json({ message: "Crawl not found" });
+        console.log(`Crawl delete failed: Crawl with ID ${id} not found`);
+        return res.status(404).json({ 
+          success: false, 
+          message: "Crawl not found" 
+        });
       }
+      
+      console.log(`Found crawl with ID ${id}, userId: ${crawl.userId}, status: ${crawl.status}`);
       
       // Verify the crawl belongs to the authenticated user
       if (crawl.userId !== userId) {
-        return res.status(403).json({ message: "You don't have permission to delete this crawl" });
+        console.log(`Crawl delete failed: Crawl belongs to user ${crawl.userId}, not ${userId}`);
+        return res.status(403).json({ 
+          success: false, 
+          message: "You don't have permission to delete this crawl" 
+        });
       }
       
-      await storage.updateCrawlStatus(id, "cancelled");
-      return res.status(204).end();
+      console.log(`Updating crawl ${id} status to 'cancelled'`);
+      const updatedCrawl = await storage.updateCrawlStatus(id, "cancelled");
+      
+      if (!updatedCrawl) {
+        console.error(`Failed to update crawl ${id} status`);
+        return res.status(500).json({ 
+          success: false, 
+          message: "Failed to update crawl status" 
+        });
+      }
+      
+      console.log(`Successfully updated crawl ${id} status to 'cancelled'`);
+      return res.status(200).json({ 
+        success: true, 
+        message: "Crawl has been marked as cancelled" 
+      });
     } catch (error) {
       console.error("Error deleting crawl:", error);
-      return res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ 
+        success: false, 
+        message: "Internal server error", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
     }
   });
 

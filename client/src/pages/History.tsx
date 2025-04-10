@@ -1,40 +1,50 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { History, Globe, ExternalLink, Trash2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { History, Globe, ExternalLink, Trash2, RefreshCw } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { getCrawlHistory, deleteCrawlHistory } from "@/lib/api";
 
 export default function HistoryPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const [isDeleting, setIsDeleting] = useState<number | null>(null);
   
   // Query to fetch crawl history
-  const { data: history = [], isLoading, refetch } = useQuery<any[]>({
+  const { data: history = [], isLoading, refetch, isRefetching } = useQuery<any[]>({
     queryKey: ['/api/crawl/history'],
+    queryFn: getCrawlHistory,
     staleTime: 10000, // 10 seconds
   });
 
-  const handleDeleteCrawl = async (id: string) => {
+  const handleDeleteCrawl = async (id: number) => {
+    if (isDeleting) return; // Prevent multiple deletes
+    
     try {
-      await fetch(`/api/crawl/history/${id}`, {
-        method: 'DELETE',
-      });
+      setIsDeleting(id);
+      console.log(`Deleting crawl with ID: ${id}`);
+      
+      await deleteCrawlHistory(id.toString());
       
       toast({
         title: "Crawl deleted",
         description: "The crawl has been removed from history",
       });
       
-      // Refresh the history list
-      refetch();
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: ['/api/crawl/history'] });
     } catch (error) {
+      console.error('Error deleting crawl:', error);
       toast({
         title: "Error",
-        description: "Failed to delete crawl",
+        description: error instanceof Error ? error.message : "Failed to delete crawl",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(null);
     }
   };
 
