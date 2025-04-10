@@ -1,0 +1,26 @@
+{
+  "common": {
+    "admin": "Admin",
+    "login": "Login",
+    "logout": "Logout",
+    "register": "Register",
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "pages": "Pages",
+    "menu": "Menu",
+    "content": "Content",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "name": "Name",
+    "email": "Email",
+    "password": "Password",
+    "title": "Title",
+    "description": "Description"
+  },
+  "pages": {
+    "page_home": "Other Services — Masjid AS-Salam  -  مسجد السلام"
+  }
+}

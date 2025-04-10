@@ -28,7 +28,12 @@ export class PreviewServer {
   private storage: IStorage;
   private converter: ReactConverter;
   private app: express.Express;
-  private activeBuilds: Map<string, { process: any, status: string, port?: number }>;
+  private activeBuilds: Map<string, { 
+    process: any, 
+    status: string, 
+    port?: number,
+    error?: string
+  }>;
   
   constructor(storage: IStorage) {
     this.storage = storage;
@@ -249,11 +254,17 @@ export class PreviewServer {
   }
   
   /**
-   * Get the build status for a site
+   * Get the build status and error for a site
    */
-  getBuildStatus(siteId: string): string {
+  getBuildStatus(siteId: string): { status: string, error?: string } {
     const build = this.activeBuilds.get(siteId);
-    return build ? build.status : 'not_started';
+    if (!build) {
+      return { status: 'not_started' };
+    }
+    return { 
+      status: build.status,
+      error: build.error
+    };
   }
   
   /**
@@ -294,6 +305,8 @@ export class PreviewServer {
    * Build a site and prepare it for preview
    */
   async buildSite(siteId: string): Promise<void> {
+    console.log(`Building site ${siteId}...`);
+    
     // Check if there's already a build in progress
     if (this.activeBuilds.has(siteId) && 
         this.activeBuilds.get(siteId)?.status === 'building') {
@@ -308,29 +321,71 @@ export class PreviewServer {
       
       // Ensure the site directory exists
       if (!fs.existsSync(siteDir)) {
-        throw new Error(`Site directory ${siteDir} not found. Please extract the site first.`);
+        console.error(`Site directory ${siteDir} not found. Please extract the site first.`);
+        this.activeBuilds.set(siteId, { 
+          process: null, 
+          status: 'failed', 
+          port: undefined,
+          error: `Site directory not found. Please extract the site first.`
+        });
+        return; // Return instead of throwing to prevent catching in the parent try-catch
+      }
+      
+      // List files in the site directory
+      console.log(`Files in site directory for ${siteId} before build process:`);
+      try {
+        fs.readdirSync(siteDir).forEach(file => {
+          console.log(`- ${file}`);
+          // Check if the file is a directory
+          const filePath = path.join(siteDir, file);
+          if (fs.statSync(filePath).isDirectory()) {
+            // List files in directory (for better debugging)
+            console.log(`  Files in ${file}:`);
+            try {
+              fs.readdirSync(filePath).forEach(subFile => {
+                console.log(`  - ${subFile}`);
+              });
+            } catch (err) {
+              console.error(`  Error reading directory ${file}:`, err);
+            }
+          }
+        });
+      } catch (err) {
+        console.error(`Error listing files in site directory:`, err);
       }
       
       // Install dependencies
       console.log(`Installing dependencies for site ${siteId}...`);
       
       try {
-        await execAsync('npm install', { cwd: siteDir, timeout: 300000 }); // 5 minute timeout
+        const { stdout: npmInstallStdout, stderr: npmInstallStderr } = 
+          await execAsync('npm install', { cwd: siteDir, timeout: 300000 }); // 5 minute timeout
+        console.log(`npm install stdout: ${npmInstallStdout}`);
+        console.log(`npm install stderr: ${npmInstallStderr}`);
       } catch (error: any) {
         console.error(`Error installing dependencies for site ${siteId}:`, error);
-        this.activeBuilds.set(siteId, { process: null, status: 'failed', port: undefined });
-        throw new Error(`Failed to install dependencies: ${error.message}`);
+        console.log(`npm install stderr: ${error.stderr || "No stderr"}`);
+        console.log(`npm install stdout: ${error.stdout || "No stdout"}`);
+        this.activeBuilds.set(siteId, { 
+          process: null, 
+          status: 'failed', 
+          port: undefined,
+          error: `Failed to install dependencies: ${error.message}` 
+        });
+        return; // Return instead of throwing to prevent catching in the parent try-catch
       }
       
       // Build the site
       console.log(`Building site ${siteId}...`);
       
-      try {
-        // Check if package.json has a build script
-        const packageJsonPath = path.join(siteDir, 'package.json');
-        if (fs.existsSync(packageJsonPath)) {
-          const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-          console.log(`Package.json scripts:`, packageJson.scripts);
+      // Check if package.json has a build script
+      const packageJsonPath = path.join(siteDir, 'package.json');
+      let packageJson: any = null;
+      
+      if (fs.existsSync(packageJsonPath)) {
+        try {
+          packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+          console.log(`Package.json content:`, JSON.stringify(packageJson, null, 2));
           
           if (!packageJson.scripts || !packageJson.scripts.build) {
             console.log(`Adding build script to package.json`);
@@ -338,23 +393,60 @@ export class PreviewServer {
               packageJson.scripts = {};
             }
             packageJson.scripts.build = 'vite build';
+            // Also add a dev script in case build refers to it
+            if (!packageJson.scripts.dev) {
+              packageJson.scripts.dev = 'vite';
+            }
             fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+            console.log(`Updated package.json:`, JSON.stringify(packageJson, null, 2));
           }
-        } else {
-          console.error(`Package.json not found at ${packageJsonPath}`);
+        } catch (error) {
+          console.error(`Error parsing or updating package.json:`, error);
+          this.activeBuilds.set(siteId, { 
+            process: null, 
+            status: 'failed', 
+            port: undefined,
+            error: `Error parsing package.json: ${error.message}` 
+          });
+          return;
         }
-        
-        // Run build
+      } else {
+        console.error(`Package.json not found at ${packageJsonPath}`);
+        this.activeBuilds.set(siteId, { 
+          process: null, 
+          status: 'failed', 
+          port: undefined,
+          error: `Package.json not found. Unable to build the site.` 
+        });
+        return;
+      }
+      
+      // Run build
+      try {
         const { stdout, stderr } = await execAsync('npm run build', { cwd: siteDir, timeout: 300000 }); // 5 minute timeout
         console.log(`Build output for site ${siteId}:`);
         console.log(`stdout: ${stdout}`);
         console.log(`stderr: ${stderr}`);
       } catch (error: any) {
         console.error(`Error building site ${siteId}:`, error);
-        console.log(`Build command stderr: ${error.stderr}`);
-        console.log(`Build command stdout: ${error.stdout}`);
-        this.activeBuilds.set(siteId, { process: null, status: 'failed', port: undefined });
-        throw new Error(`Failed to build site: ${error.message}`);
+        console.log(`Build command stderr: ${error.stderr || 'No stderr'}`);
+        console.log(`Build command stdout: ${error.stdout || 'No stdout'}`);
+        
+        // Try to provide more detailed error information
+        let errorMessage = `Failed to build site: ${error.message}`;
+        if (error.stderr && error.stderr.includes('command not found')) {
+          errorMessage = `Build failed: The required build tools were not found. Please check package.json configuration.`;
+        } else if (error.stderr && error.stderr.includes('ERR_MODULE_NOT_FOUND')) {
+          errorMessage = `Build failed: A required module was not found. Please check project dependencies.`;
+        }
+        
+        this.activeBuilds.set(siteId, { 
+          process: null, 
+          status: 'failed', 
+          port: undefined,
+          error: errorMessage
+        });
+        return;
       }
       
       // Check if the build was successful
@@ -362,20 +454,33 @@ export class PreviewServer {
       if (!fs.existsSync(distDir)) {
         console.error(`Dist directory not found at ${distDir} after build`);
         // List files in the site directory
-        console.log(`Files in site directory for ${siteId}:`);
-        fs.readdirSync(siteDir).forEach(file => {
-          console.log(`- ${file}`);
-        });
+        console.log(`Files in site directory for ${siteId} after build attempt:`);
+        try {
+          fs.readdirSync(siteDir).forEach(file => {
+            console.log(`- ${file}`);
+          });
+        } catch (err) {
+          console.error(`Error listing files after build:`, err);
+        }
         
-        this.activeBuilds.set(siteId, { process: null, status: 'failed', port: undefined });
-        throw new Error('Build completed but no dist directory was created');
+        this.activeBuilds.set(siteId, { 
+          process: null, 
+          status: 'failed', 
+          port: undefined,
+          error: 'Build completed but no dist directory was created. Check package.json configuration.'
+        });
+        return;
       } else {
         console.log(`Dist directory created for site ${siteId}`);
         // List files in the dist directory
         console.log(`Files in dist directory for ${siteId}:`);
-        fs.readdirSync(distDir).forEach(file => {
-          console.log(`- ${file}`);
-        });
+        try {
+          fs.readdirSync(distDir).forEach(file => {
+            console.log(`- ${file}`);
+          });
+        } catch (err) {
+          console.error(`Error listing files in dist directory:`, err);
+        }
       }
       
       // Mark as complete
@@ -384,8 +489,12 @@ export class PreviewServer {
       console.log(`Site ${siteId} built successfully`);
     } catch (error) {
       console.error(`Error building site ${siteId}:`, error);
-      this.activeBuilds.set(siteId, { process: null, status: 'failed', port: undefined });
-      throw error;
+      this.activeBuilds.set(siteId, { 
+        process: null, 
+        status: 'failed', 
+        port: undefined,
+        error: `Unexpected error: ${error.message || 'Unknown error'}`
+      });
     }
   }
 }

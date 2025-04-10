@@ -1,0 +1,26 @@
+{
+  "common": {
+    "admin": "مدير",
+    "login": "تسجيل الدخول",
+    "logout": "تسجيل الخروج",
+    "register": "تسجيل",
+    "dashboard": "لوحة القيادة",
+    "settings": "إعدادات",
+    "pages": "صفحات",
+    "menu": "قائمة",
+    "content": "محتوى",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "create": "إنشاء",
+    "name": "اسم",
+    "email": "بريد إلكتروني",
+    "password": "كلمة المرور",
+    "title": "عنوان",
+    "description": "وصف"
+  },
+  "pages": {
+    "page_home": "Other Services — Masjid AS-Salam  -  مسجد السلام (AR)"
+  }
+}

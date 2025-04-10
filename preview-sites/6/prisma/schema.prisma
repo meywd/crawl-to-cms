@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String   @default("user") // "admin" or "user"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Language {
+  id      Int     @id @default(autoincrement())
+  code    String  @unique
+  name    String
+  isActive Boolean @default(true)
+  menuItems MenuItem[]
+  pageContents PageContent[]
+  sections Section[]
+}
+
+model MenuItem {
+  id        Int      @id @default(autoincrement())
+  languageId Int
+  language  Language @relation(fields: [languageId], references: [id])
+  title     String
+  slug      String
+  order     Int
+  parentId  Int?
+  parent    MenuItem? @relation("MenuItemToMenuItem", fields: [parentId], references: [id])
+  children  MenuItem[] @relation("MenuItemToMenuItem")
+  isActive  Boolean @default(true)
+  page      Page?    @relation(fields: [pageId], references: [id])
+  pageId    Int?
+  externalUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Page {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique
+  menuItems MenuItem[]
+  contents  PageContent[]
+  sections  Section[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PageContent {
+  id          Int      @id @default(autoincrement())
+  pageId      Int
+  page        Page     @relation(fields: [pageId], references: [id])
+  languageId  Int
+  language    Language @relation(fields: [languageId], references: [id])
+  title       String
+  description String?
+  metaTitle   String?
+  metaDescription String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Section {
+  id          Int      @id @default(autoincrement())
+  pageId      Int
+  page        Page     @relation(fields: [pageId], references: [id])
+  languageId  Int
+  language    Language @relation(fields: [languageId], references: [id])
+  type        String   // "hero", "content", "gallery", etc.
+  order       Int
+  title       String?
+  content     String?
+  imageUrl    String?
+  settings    Json?    // Additional settings as JSON
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Setting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
