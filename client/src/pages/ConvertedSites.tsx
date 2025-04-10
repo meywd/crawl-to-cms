@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistance } from 'date-fns';
-import { Download, Trash2, Coffee, Loader2, AlertTriangle, Search, Play, CheckCircle2 } from 'lucide-react';
+import { Download, Trash2, Coffee, Loader2, AlertTriangle, Search, Play, CheckCircle2, RefreshCw } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -234,12 +234,29 @@ const ConvertedSites: React.FC = () => {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
-  // Fetch converted sites
-  const { data: convertedSites, isLoading, error } = useQuery({
+  // Fetch converted sites with more frequent polling and manual refresh capability
+  const { 
+    data: convertedSites, 
+    isLoading, 
+    error, 
+    refetch,
+    isRefetching 
+  } = useQuery({
     queryKey: ['/api/sites/converted'],
     queryFn: getConvertedSites,
-    refetchInterval: 5000 // Refetch every 5 seconds to update conversion progress
+    refetchInterval: 3000, // More frequent refetch (every 3 seconds)
+    refetchOnWindowFocus: true, // Refetch when window gets focus
+    staleTime: 2000, // Consider data stale after 2 seconds
   });
+
+  // Create event handlers
+  const handleRefresh = () => {
+    refetch();
+    toast({
+      title: "Refreshing...",
+      description: "Updating converted sites list.",
+    });
+  };
 
   // Delete site mutation
   const deleteMutation = useMutation({
@@ -286,7 +303,13 @@ const ConvertedSites: React.FC = () => {
   if (isLoading) {
     return (
       <div className="container mx-auto py-8">
-        <h1 className="text-3xl font-bold mb-6">Converted React Sites</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Converted React Sites</h1>
+          <Button variant="outline" size="sm" disabled>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Loading...
+          </Button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="w-full">
@@ -311,7 +334,13 @@ const ConvertedSites: React.FC = () => {
   if (error) {
     return (
       <div className="container mx-auto py-8">
-        <h1 className="text-3xl font-bold mb-6">Converted React Sites</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Converted React Sites</h1>
+          <Button onClick={handleRefresh} variant="outline" size="sm">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Retry
+          </Button>
+        </div>
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-md">
           <p className="text-red-800 dark:text-red-200">Error loading converted sites: {(error as Error).message}</p>
         </div>
@@ -337,10 +366,27 @@ const ConvertedSites: React.FC = () => {
   const inProgressCount = inProgressSites.length;
   const completedCount = completedSites.length;
   const failedCount = failedSites.length;
+  
+  // Track number of in-progress sites to show active update indicator
+  const hasInProgressSites = inProgressCount > 0;
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">Converted React Sites</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Converted React Sites</h1>
+        <Button 
+          onClick={handleRefresh} 
+          variant="outline" 
+          size="sm"
+          disabled={isRefetching}
+          className={`transition-all duration-200 ${hasInProgressSites ? 'bg-blue-50 border-blue-200' : ''}`}
+        >
+          <RefreshCw 
+            className={`w-4 h-4 mr-2 ${isRefetching ? 'animate-spin' : ''} ${hasInProgressSites ? 'animate-pulse text-blue-600' : ''}`}
+          />
+          Refresh{isRefetching ? 'ing...' : ''}
+        </Button>
+      </div>
       
       {convertedSites?.length === 0 ? (
         <div className="bg-muted p-6 rounded-md text-center">
